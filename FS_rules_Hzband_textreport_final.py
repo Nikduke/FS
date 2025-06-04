@@ -24,7 +24,6 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
-from tqdm import tqdm
 
 # ───── CONFIGURATION PARAMETERS ──────────────────────────────────────────
 INCLUDE_NEGATIVE_PEAKS = True         # If True, also detect negative peaks (dips) in X/Z curves
@@ -216,7 +215,7 @@ sel_abs = {}
 
 if ENABLE_ABSOLUTE:
     print("▶ 3. Applying absolute rules …")
-    for c in tqdm(cases, desc="Absolute rules", unit="case"):
+    for c in cases:
         fpk = meta.at[c, "f_pk"]
 
         # R1: Largest |Z1| at 2H/3H harmonic BIN peaks, with |X1_peak| ≤ 0.05·Z_peak
