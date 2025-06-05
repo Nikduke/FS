@@ -532,14 +532,16 @@ def main():
         axs[-1].set_xlabel("Harmonic Number (n)")
         return axs[0].get_legend_handles_labels()
     
-    # 9a. Positive‐sequence plots (X1, R1, X1/R1)
+    # 9a. Positive‐sequence plots (X1, R1, X1/R1, Z1)
     print("▶ 9a. Positive‐sequence plots …")
     metrics_pos = [
         ("X1", X1, "X1 (Ω)"),
         ("R1", R1, "R1 (Ω)"),
         ("X1/R1", X1.div(R1.replace(0, np.nan)), "X1/R1"),
+        ("Z1", Z1, "Z1 (Ω)"),
     ]
-    fig1, axs1 = plt.subplots(3, 1, figsize=(10, 11), sharex=True)
+    fig1, axs1 = plt.subplots(4, 1, figsize=(10, 14), sharex=True)
+
     h1, labs1 = plot_sequence(axs1, metrics_pos, pos_cases, lambda c: c)
 
     reserve_and_legend(fig1, axs1, h1, labs1, peer_first_tag, case_expl)
@@ -547,14 +549,15 @@ def main():
     fig1.savefig(FIG_POS, dpi=300)
     print(f"   ↳ saved {FIG_POS.name}")
     
-    # 9b. Zero‐sequence plots (X0, R0, X0/R0)
+    # 9b. Zero‐sequence plots (X0, R0, X0/R0, Z0)
     print("▶ 9b. Zero‐sequence plots …")
     metrics_zero = [
         ("X0", X0, "X0 (Ω)"),
         ("R0", R0, "R0 (Ω)"),
         ("X0/R0", X0.div(R0.replace(0, np.nan)), "X0/R0"),
+        ("Z0", Z0, "Z0 (Ω)"),
     ]
-    fig2, axs2 = plt.subplots(3, 1, figsize=(8, 12), sharex=True)
+    fig2, axs2 = plt.subplots(4, 1, figsize=(8, 15), sharex=True)
     h2, labs2 = plot_sequence(axs2, metrics_zero, zero_cases, lambda c: c)
     reserve_and_legend(fig2, axs2, h2, labs2, peer_first_tag, case_expl)
     fig2.savefig(FIG_ZERO, dpi=300)
@@ -569,7 +572,6 @@ def main():
         pos_abs = [c for c in abs_cases if not sel_abs[c].endswith("_0")]
         zero_abs = [c for c in abs_cases if sel_abs[c].endswith("_0")]
 
-        fig3, axs3 = plt.subplots(3, 2, figsize=(14, 11), sharex="col")
         handles, labels = [], []
         if pos_abs:
             h3p, lab3p = plot_sequence(axs3[:, 0], metrics_pos, pos_abs, lambda c: c)
