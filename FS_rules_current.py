@@ -508,10 +508,6 @@ def main():
     
     def reserve_and_legend(fig, axs, handles, raw_labels, tag_map, expl_map):
         labels = [f"{c}: {tag_map[c]} – {expl_map[c]}" for c in raw_labels]
-
-    def reserve_and_legend(fig, axs, handles, raw_labels):
-        labels = [f"{c}: {peer_first_tag[c]} – {case_expl[c]}" for c in raw_labels]
-
         n = len(labels)
         line_height = 0.03
         legend_height = n * line_height
