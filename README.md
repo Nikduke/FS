@@ -21,7 +21,7 @@ python FS_rules_current.py
 
 `FS_rules_current.py` represents the latest code, while the previous `FS_rules_Hzband_textreport_final.py` is kept in the repository for historical reference.
 
-Adjust configuration constants at the top of the script to change behaviour. In particular, `MAX_REL_CASES` controls how many cases are kept for each relative rule.
+Adjust configuration constants at the top of the script to change behaviour. In particular, `MAX_REL_CASES` controls how many cases are kept for each relative rule. `ENV_Z_SHIFT` sets the envelope-rule difference threshold used when absolute rules are enabled. You may override it by defining the environment variable before running, e.g. `ENV_Z_SHIFT=0.1 python FS_rules_current.py`. (The parameter has no effect unless `ENABLE_ABSOLUTE` is `True`.)
 
 ## Outputs
 
