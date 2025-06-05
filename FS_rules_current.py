@@ -574,6 +574,7 @@ def main():
         pos_abs = [c for c in abs_cases if not sel_abs[c].endswith("_0")]
         zero_abs = [c for c in abs_cases if sel_abs[c].endswith("_0")]
 
+        fig3, axs3 = plt.subplots(4, 2, figsize=(14, 15), sharex="col")
         handles, labels = [], []
         if pos_abs:
             h3p, lab3p = plot_sequence(axs3[:, 0], metrics_pos, pos_abs, lambda c: c)
