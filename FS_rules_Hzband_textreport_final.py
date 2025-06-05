@@ -8,7 +8,9 @@ Highlights
     • Optional absolute-rule analysis controlled by configuration.
     • Each relative rule stores up to ``MAX_REL_CASES`` cases.
     • Generates plain-text reports and sequence plots.
+
     • Absolute winners are visualized separately when enabled.
+
 
 Outputs
     – ``absolute_worst_cases.txt``
@@ -506,8 +508,13 @@ def main():
     harmonics = np.arange(1, MAX_HARMONIC + 1)
     bin_halfwidth = HARMONIC_BAND_HZ / FUND
     
+
     def reserve_and_legend(fig, axs, handles, raw_labels, tag_map, expl_map):
         labels = [f"{c}: {tag_map[c]} – {expl_map[c]}" for c in raw_labels]
+=======
+    def reserve_and_legend(fig, axs, handles, raw_labels):
+        labels = [f"{c}: {peer_first_tag[c]} – {case_expl[c]}" for c in raw_labels]
+
         n = len(labels)
         line_height = 0.03
         legend_height = n * line_height
@@ -541,7 +548,9 @@ def main():
     ]
     fig1, axs1 = plt.subplots(3, 1, figsize=(10, 11), sharex=True)
     h1, labs1 = plot_sequence(axs1, metrics_pos, pos_cases, lambda c: c)
+
     reserve_and_legend(fig1, axs1, h1, labs1, peer_first_tag, case_expl)
+
     fig1.savefig(FIG_POS, dpi=300)
     print(f"   ↳ saved {FIG_POS.name}")
     
@@ -554,6 +563,7 @@ def main():
     ]
     fig2, axs2 = plt.subplots(3, 1, figsize=(8, 12), sharex=True)
     h2, labs2 = plot_sequence(axs2, metrics_zero, zero_cases, lambda c: c)
+
     reserve_and_legend(fig2, axs2, h2, labs2, peer_first_tag, case_expl)
     fig2.savefig(FIG_ZERO, dpi=300)
     print(f"   ↳ saved {FIG_ZERO.name}")
@@ -586,6 +596,7 @@ def main():
         reserve_and_legend(fig3, axs3.ravel(), handles, labels, abs_first_tag, abs_case_expl)
         fig3.savefig(FIG_ABS, dpi=300)
         print(f"   ↳ saved {FIG_ABS.name}")
+
 
     plt.show()
     
