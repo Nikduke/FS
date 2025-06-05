@@ -1,6 +1,8 @@
 # Frequency Sweep Worst-Case Selection
 
-This repository contains a single script `FS_rules_Hzband_textreport_final.py` that analyzes impedance sweeps stored in an Excel workbook and identifies worst cases according to absolute and relative rules.
+This repository contains the Python scripts for analyzing impedance sweeps stored in an Excel workbook and identifying worst cases according to absolute and relative rules.
+
+`FS_rules_current.py` is the most up-to-date version of the tool. The original file `FS_rules_Hzband_textreport_final.py` is preserved alongside it for reference.
 
 ## Requirements
 
@@ -14,8 +16,10 @@ Provide `fs_seet.xlsx` with sheets `R1`, `X1`, `R0`, and `X0`. Each sheet should
 ## Running
 
 ```bash
-python FS_rules_Hzband_textreport_final.py
+python FS_rules_current.py
 ```
+
+`FS_rules_current.py` represents the latest code, while the previous `FS_rules_Hzband_textreport_final.py` is kept in the repository for historical reference.
 
 Adjust configuration constants at the top of the script to change behaviour. In particular, `MAX_REL_CASES` controls how many cases are kept for each relative rule.
 
