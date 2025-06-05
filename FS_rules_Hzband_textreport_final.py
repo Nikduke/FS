@@ -35,6 +35,7 @@ Z_REF, X_REF = 100.0, 50.0       # Reference impedances [Ω]
 CLUSTER_BAND = 0.03              # ±3% clustering for envelope rule (C3)
 ENV_Z_SHIFT = 0.05               # ±10% impedance difference for envelope rule (C3)
 MIN_REL_LIST = 5                 # Minimum number of relative worst cases
+MAX_REL_CASES = 5                # Max cases to keep per relative rule
 PEAK_PROMINENCE = None           # Prominence for find_peaks (None = no filtering)
 BOOK = Path("FS_sweep.xlsx")     # Input workbook
 ABS_OUT = Path("absolute_worst_cases.txt")
@@ -322,7 +323,8 @@ else:
 # ───── 6. Build Relative Peer‐Metric List ─────────────────────────────────
 print("▶ 6. Building relative peer‐metric list …")
 peer_pool = [c for c in cases if c not in sel_abs]
-peer_tags = {}
+peer_rule_cases = {}
+peer_first_tag = {}
 
 # Build REL_ORDER dynamically: exact then peak for each harmonic, positive then zero
 for n in range(2, MAX_HARMONIC + 1):
@@ -345,21 +347,36 @@ for n in range(2, MAX_HARMONIC + 1):
     X_exact = meta[f"X1_exact_{n}"].abs().loc[peer_pool]
     Q_exact = meta[f"Q1_exact_{n}"].loc[peer_pool]
     if not Z_exact.empty:
-        peer_tags[Z_exact.idxmax()] = f"H-Z_exact({n}H)"
+        for c in Z_exact.nlargest(MAX_REL_CASES).index:
+            peer_rule_cases.setdefault(f"H-Z_exact({n}H)", []).append(c)
+            peer_first_tag.setdefault(c, f"H-Z_exact({n}H)")
     if not X_exact.empty:
-        peer_tags[X_exact.idxmax()] = f"H-X_exact({n}H)"
+        for c in X_exact.nlargest(MAX_REL_CASES).index:
+            peer_rule_cases.setdefault(f"H-X_exact({n}H)", []).append(c)
+            peer_first_tag.setdefault(c, f"H-X_exact({n}H)")
     if not Q_exact.empty:
-        peer_tags[Q_exact.idxmax()] = f"H-Q_exact({n}H)"
+        for c in Q_exact.nlargest(MAX_REL_CASES).index:
+            peer_rule_cases.setdefault(f"H-Q_exact({n}H)", []).append(c)
+            peer_first_tag.setdefault(c, f"H-Q_exact({n}H)")
 
     Z_peak = meta[f"Z1_peak_{n}"].loc[peer_pool]
     X_peak = meta[f"X1_peak_{n}"].abs().loc[peer_pool]
     Q_peak = meta[f"Q1_peak_{n}"].loc[peer_pool]
     if not Z_peak.empty:
-        peer_tags[Z_peak.idxmax()] = f"H-Z_peak({n}H)"
+        top_cases = Z_peak[Z_peak > 0].nlargest(MAX_REL_CASES).index
+        for c in top_cases:
+            peer_rule_cases.setdefault(f"H-Z_peak({n}H)", []).append(c)
+            peer_first_tag.setdefault(c, f"H-Z_peak({n}H)")
     if not X_peak.empty:
-        peer_tags[X_peak.idxmax()] = f"H-X_peak({n}H)"
+        top_cases = X_peak[X_peak > 0].nlargest(MAX_REL_CASES).index
+        for c in top_cases:
+            peer_rule_cases.setdefault(f"H-X_peak({n}H)", []).append(c)
+            peer_first_tag.setdefault(c, f"H-X_peak({n}H)")
     if not Q_peak.empty:
-        peer_tags[Q_peak.idxmax()] = f"H-Q_peak({n}H)"
+        top_cases = Q_peak[Q_peak > 0].nlargest(MAX_REL_CASES).index
+        for c in top_cases:
+            peer_rule_cases.setdefault(f"H-Q_peak({n}H)", []).append(c)
+            peer_first_tag.setdefault(c, f"H-Q_peak({n}H)")
 
 # 6.b Zero sequence exact and bin‐peak
 for n in range(2, MAX_HARMONIC + 1):
@@ -367,35 +384,58 @@ for n in range(2, MAX_HARMONIC + 1):
     X0_exact = meta[f"X0_exact_{n}"].abs().loc[peer_pool]
     Q0_exact = meta[f"Q0_exact_{n}"].loc[peer_pool]
     if not Z0_exact.empty:
-        peer_tags[Z0_exact.idxmax()] = f"H-Z0_exact({n}H)"
+        for c in Z0_exact.nlargest(MAX_REL_CASES).index:
+            peer_rule_cases.setdefault(f"H-Z0_exact({n}H)", []).append(c)
+            peer_first_tag.setdefault(c, f"H-Z0_exact({n}H)")
     if not X0_exact.empty:
-        peer_tags[X0_exact.idxmax()] = f"H-X0_exact({n}H)"
+        for c in X0_exact.nlargest(MAX_REL_CASES).index:
+            peer_rule_cases.setdefault(f"H-X0_exact({n}H)", []).append(c)
+            peer_first_tag.setdefault(c, f"H-X0_exact({n}H)")
     if not Q0_exact.empty:
-        peer_tags[Q0_exact.idxmax()] = f"H-Q0_exact({n}H)"
+        for c in Q0_exact.nlargest(MAX_REL_CASES).index:
+            peer_rule_cases.setdefault(f"H-Q0_exact({n}H)", []).append(c)
+            peer_first_tag.setdefault(c, f"H-Q0_exact({n}H)")
 
     Z0_peak = meta[f"Z0_peak_{n}"].loc[peer_pool]
     X0_peak = meta[f"X0_peak_{n}"].abs().loc[peer_pool]
     Q0_peak = meta[f"Q0_peak_{n}"].loc[peer_pool]
     if not Z0_peak.empty:
-        peer_tags[Z0_peak.idxmax()] = f"H-Z0_peak({n}H)"
+        top_cases = Z0_peak[Z0_peak > 0].nlargest(MAX_REL_CASES).index
+        for c in top_cases:
+            peer_rule_cases.setdefault(f"H-Z0_peak({n}H)", []).append(c)
+            peer_first_tag.setdefault(c, f"H-Z0_peak({n}H)")
     if not X0_peak.empty:
-        peer_tags[X0_peak.idxmax()] = f"H-X0_peak({n}H)"
+        top_cases = X0_peak[X0_peak > 0].nlargest(MAX_REL_CASES).index
+        for c in top_cases:
+            peer_rule_cases.setdefault(f"H-X0_peak({n}H)", []).append(c)
+            peer_first_tag.setdefault(c, f"H-X0_peak({n}H)")
     if not Q0_peak.empty:
-        peer_tags[Q0_peak.idxmax()] = f"H-Q0_peak({n}H)"
+        top_cases = Q0_peak[Q0_peak > 0].nlargest(MAX_REL_CASES).index
+        for c in top_cases:
+            peer_rule_cases.setdefault(f"H-Q0_peak({n}H)", []).append(c)
+            peer_first_tag.setdefault(c, f"H-Q0_peak({n}H)")
 
 # 6.c Global peer metrics
 if peer_pool:
-    peer_tags[meta.loc[peer_pool, "Q1_pk"].idxmax()] = "Q-R"
-    peer_tags[meta.loc[peer_pool, "R1_min"].idxmin()] = "R-Min"
-    peer_tags[meta.loc[peer_pool, "f_pk"].idxmin()] = "E-Zero"
-    peer_tags[meta.loc[peer_pool, "ΣZ1"].idxmax()] = "ΣZ"
-    peer_tags[meta.loc[peer_pool, "Q0_pk"].idxmax()] = "Q0-R"
-    peer_tags[meta.loc[peer_pool, "R0_min"].idxmin()] = "R0-Min"
-    peer_tags[meta.loc[peer_pool, "ΣZ0"].idxmax()] = "ΣZ0"
+    for tag, series, smallest in [
+        ("Q-R", meta.loc[peer_pool, "Q1_pk"], False),
+        ("R-Min", meta.loc[peer_pool, "R1_min"], True),
+        ("E-Zero", meta.loc[peer_pool, "f_pk"], True),
+        ("ΣZ", meta.loc[peer_pool, "ΣZ1"], False),
+        ("Q0-R", meta.loc[peer_pool, "Q0_pk"], False),
+        ("R0-Min", meta.loc[peer_pool, "R0_min"], True),
+        ("ΣZ0", meta.loc[peer_pool, "ΣZ0"], False),
+    ]:
+        cases_sorted = (series.nsmallest(MAX_REL_CASES) if smallest else series.nlargest(MAX_REL_CASES)).index
+        for c in cases_sorted:
+            peer_rule_cases.setdefault(tag, []).append(c)
+            peer_first_tag.setdefault(c, tag)
 
-print(f"   Initial peer count = {len(peer_tags)}")
-for c, t in peer_tags.items():
-    print(f"    {t} → {c}")
+total_selected = sum(len(v) for v in peer_rule_cases.values())
+print(f"   Initial peer count = {total_selected}")
+for tag in REL_ORDER:
+    for c in peer_rule_cases.get(tag, []):
+        print(f"    {tag} → {c}")
 
 # 7. Top‐Up fallback if fewer than MIN_REL_LIST
 ladder = (
@@ -406,12 +446,13 @@ ladder = (
     meta["X1_min"].abs() / X_REF
 )
 print("▶ 7. Top-up if needed …")
-while len(peer_tags) < MIN_REL_LIST:
-    remaining = [c for c in ladder.index if c not in peer_tags]
+while len(peer_first_tag) < MIN_REL_LIST:
+    remaining = [c for c in ladder.index if c not in peer_first_tag]
     nxt = pd.Series(ladder.loc[remaining]).idxmax()
-    peer_tags[nxt] = "TopUp"
+    peer_rule_cases.setdefault("TopUp", []).append(nxt)
+    peer_first_tag.setdefault(nxt, "TopUp")
     print(f"    TopUp → {nxt} (score={ladder[nxt]:.2f})")
-print(f"   Final peer count = {len(peer_tags)}")
+print(f"   Final peer count = {len(peer_first_tag)}")
 
 # ───── 8. Emit Text Lists ─────────────────────────────────────────────────
 def emit(path, mapping, title, order):
@@ -424,34 +465,36 @@ def emit(path, mapping, title, order):
     print("─" * 130)
     lines = []
     for tag in order:
-        for case, st in mapping.items():
-            if st == tag:
-                explanation = LABELS.get(st, "")
-                line = (
-                    f"{case} | {st} | {explanation} | "
-                    f"f_pk={meta.at[case,'f_pk']:.1f}Hz | "
-                    f"Z1_pk={meta.at[case,'Z1_pk']:.1f}Ω | "
-                    f"Q1_pk={meta.at[case,'Q1_pk']:.2f}"
-                )
-                lines.append(line)
-                print(
-                    f"{case:<38} {st:<14} {meta.at[case,'f_pk']:>5.1f}  "
-                    f"{meta.at[case,'Z1_pk']:>7.1f}  {meta.at[case,'Q1_pk']:>6.2f}   {explanation}"
-                )
+        for case in mapping.get(tag, []):
+            explanation = LABELS.get(tag, "")
+            line = (
+                f"{case} | {tag} | {explanation} | "
+                f"f_pk={meta.at[case,'f_pk']:.1f}Hz | "
+                f"Z1_pk={meta.at[case,'Z1_pk']:.1f}Ω | "
+                f"Q1_pk={meta.at[case,'Q1_pk']:.2f}"
+            )
+            lines.append(line)
+            print(
+                f"{case:<38} {tag:<14} {meta.at[case,'f_pk']:>5.1f}  "
+                f"{meta.at[case,'Z1_pk']:>7.1f}  {meta.at[case,'Q1_pk']:>6.2f}   {explanation}"
+            )
     path.write_text("\n".join(lines), encoding="utf-8")
     print(f"   ↳ saved {len(lines)} rows to {path.name}")
 
-emit(ABS_OUT, sel_abs, "ABSOLUTE RULE LIST", ABS_ORDER)
-emit(REL_OUT, peer_tags, "RELATIVE TOP-5 LIST", REL_ORDER)
+abs_map = {}
+for case, tag in sel_abs.items():
+    abs_map.setdefault(tag, []).append(case)
+emit(ABS_OUT, abs_map, "ABSOLUTE RULE LIST", ABS_ORDER)
+emit(REL_OUT, peer_rule_cases, "RELATIVE TOP-5 LIST", REL_ORDER)
 
 # ───── 9. Plotting Selected Cases with Harmonic Lines ────────────────────
 print("▶ 9. Plotting selected cases …")
-all_cases = list(peer_tags.keys())
-case_expl = {c: LABELS.get(peer_tags[c], "") for c in all_cases}
+all_cases = list(peer_first_tag.keys())
+case_expl = {c: LABELS.get(peer_first_tag[c], "") for c in all_cases}
 
 pos_cases = [
     c for c in all_cases
-    if not peer_tags[c].startswith(("H-X0", "H-Z0", "H-Q0", "Q0-R", "R0-Min", "E-Zero0", "ΣZ0"))
+    if not peer_first_tag[c].startswith(("H-X0", "H-Z0", "H-Q0", "Q0-R", "R0-Min", "E-Zero0", "ΣZ0"))
 ]
 zero_cases = [c for c in all_cases if c not in pos_cases]
 
@@ -461,7 +504,7 @@ bin_halfwidth = HARMONIC_BAND_HZ / FUND
 ticks = harmonics
 
 def reserve_and_legend(fig, axs, handles, raw_labels):
-    labels = [f"{c}: {peer_tags[c]} – {case_expl[c]}" for c in raw_labels]
+    labels = [f"{c}: {peer_first_tag[c]} – {case_expl[c]}" for c in raw_labels]
     n = len(labels)
     line_height = 0.03
     legend_height = n * line_height
@@ -501,7 +544,7 @@ fig1.subplots_adjust(top=0.92, bottom=0.30)
 # Add clean outside legend
 fig1.legend(
     handles=lines_pos,
-    labels=[f"{c}: {peer_tags[c]} – {case_expl[c]}" for c in pos_cases],
+    labels=[f"{c}: {peer_first_tag[c]} – {case_expl[c]}" for c in pos_cases],
     loc="lower center", bbox_to_anchor=(0.5, 0.02),
     ncol=2, fontsize="small", frameon=False
 )
@@ -559,31 +602,25 @@ def write_text_report(path):
         lines.append("")
 
         tag_map = defaultdict(list)
-        for case, tag in peer_tags.items():
-            tag_map[case].append(tag)
+        for tag, cases_list in peer_rule_cases.items():
+            for case in cases_list:
+                tag_map[case].append(tag)
 
-        def emit_section(title, tag_filter, use_Z0=False):
-            lines.append(title)
-            lines.append("-" * len(title))
-            for case, tags in tag_map.items():
-                for tag in tags:
-                    if tag in tag_filter:
-                        fpk = meta.at[case, "f_pk"]
-                        zpk = meta.at[case, "Z0_pk" if use_Z0 else "Z1_pk"]
-                        qpk = meta.at[case, "Q0_pk" if use_Z0 else "Q1_pk"]
-                        lines.append(f"{case:<40} | {tag:<8} | {fpk:6.1f} Hz | Z={zpk:7.1f} Ω | Q={qpk:4.2f}")
+        for tag in REL_ORDER:
+            lines.append(tag)
+            lines.append("-" * len(tag))
+            for case in peer_rule_cases.get(tag, []):
+                use_Z0 = tag.startswith(("H-X0", "H-Z0", "H-Q0", "Q0-R", "R0-Min", "ΣZ0"))
+                fpk = meta.at[case, "f_pk"]
+                zpk = meta.at[case, "Z0_pk" if use_Z0 else "Z1_pk"]
+                qpk = meta.at[case, "Q0_pk" if use_Z0 else "Q1_pk"]
+                lines.append(f"{case:<40} | {fpk:6.1f} Hz | Z={zpk:7.1f} Ω | Q={qpk:4.2f}")
             lines.append("")
-
-        pos_tags = [t for t in REL_ORDER if not t.startswith(("H-X0", "H-Z0", "Q0", "R0", "ΣZ0"))]
-        zero_tags = [t for t in REL_ORDER if t not in pos_tags]
-
-        emit_section("1. Positive Sequence Selection", pos_tags, use_Z0=False)
-        emit_section("2. Zero Sequence Selection", zero_tags, use_Z0=True)
 
         # Duplicates
         dup_cases = {c: t for c, t in tag_map.items() if len(t) > 1}
         if dup_cases:
-            lines.append("3. Duplicate Cases Triggered by Multiple Rules")
+            lines.append("Duplicate Cases Triggered by Multiple Rules")
             lines.append("-" * 44)
             for case, tags in dup_cases.items():
                 fpk = meta.at[case, "f_pk"]
