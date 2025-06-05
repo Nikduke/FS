@@ -509,12 +509,14 @@ def main():
     def reserve_and_legend(fig, axs, handles, raw_labels, tag_map, expl_map):
         labels = [f"{c}: {tag_map[c]} – {expl_map[c]}" for c in raw_labels]
         n = len(labels)
+        ncols = 2
+        nrows = (n + ncols - 1) // ncols
         line_height = 0.03
-        legend_height = n * line_height
+        legend_height = nrows * line_height
         bottom_margin = min(0.05 + legend_height + 0.02, 0.5)
         fig.subplots_adjust(top=0.95, bottom=bottom_margin, hspace=0.3)
         y_anchor = bottom_margin / 2
-        fig.legend(handles, labels, loc="lower center", ncol=1,
+        fig.legend(handles, labels, loc="lower center", ncol=ncols,
                    frameon=False, fontsize="small", bbox_to_anchor=(0.5, y_anchor))
     
     def plot_sequence(axs, metrics, cases, label_func):
