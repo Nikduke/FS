@@ -18,6 +18,7 @@ Outputs
     – ``zero_sequence.png``
 """
 
+import os
 import sys
 from pathlib import Path
 
@@ -34,7 +35,7 @@ MAX_HARMONIC = 4                 # Highest harmonic to check (2..MAX_HARMONIC)
 HARMONIC_BAND_HZ = 5.0  # ±Hz band around each harmonic (e.g. ±5 Hz of n·FUND)
 Z_REF, X_REF = 100.0, 50.0       # Reference impedances [Ω]
 CLUSTER_BAND = 0.03              # ±3% clustering for envelope rule (C3)
-ENV_Z_SHIFT = 0.05               # ±10% impedance difference for envelope rule (C3)
+ENV_Z_SHIFT = float(os.getenv("ENV_Z_SHIFT", "0.05"))  # Fractional |Z| difference for C3
 MIN_REL_LIST = 5                 # Minimum number of relative worst cases
 MAX_REL_CASES = 5                # Max cases to keep per relative rule
 PEAK_PROMINENCE = None           # Prominence for find_peaks (None = no filtering)
@@ -52,7 +53,8 @@ FIG_ABS = Path("absolute_cases.png")
 #  - HARMONIC_BAND_HZ: window size around each harmonic. With FUND=60 and n=2,
 #      the band spans 120±5 Hz (115–125 Hz).
 #  - PEAK_PROMINENCE: threshold for scipy.find_peaks; if None, all local maxima count.
-#  - Z_REF, X_REF, CLUSTER_BAND, ENV_Z_SHIFT: absolute‐rule thresholds; adjust per your study.
+#  - Z_REF, X_REF, CLUSTER_BAND, ENV_Z_SHIFT: absolute‐rule thresholds. ENV_Z_SHIFT
+#    can also be set via the environment variable ``ENV_Z_SHIFT``.
 
 # ─────────────────────────────────────────────────────────────────────────
 # Build LABELS dictionary including new exact/peak tags
@@ -309,7 +311,7 @@ def main():
             print(f"    {rule} → {winner}")
     
         # 5. Envelope rule C3
-        print("▶ 5. Applying envelope rule C3 …")
+        print(f"▶ 5. Applying envelope rule C3 (ENV_Z_SHIFT={ENV_Z_SHIFT}) …")
         for c in cases:
             if c in sel_abs:
                 continue
@@ -509,12 +511,14 @@ def main():
     def reserve_and_legend(fig, axs, handles, raw_labels, tag_map, expl_map):
         labels = [f"{c}: {tag_map[c]} – {expl_map[c]}" for c in raw_labels]
         n = len(labels)
+        ncols = 2
+        nrows = (n + ncols - 1) // ncols
         line_height = 0.03
-        legend_height = n * line_height
+        legend_height = nrows * line_height
         bottom_margin = min(0.05 + legend_height + 0.02, 0.5)
         fig.subplots_adjust(top=0.95, bottom=bottom_margin, hspace=0.3)
         y_anchor = bottom_margin / 2
-        fig.legend(handles, labels, loc="lower center", ncol=1,
+        fig.legend(handles, labels, loc="lower center", ncol=ncols,
                    frameon=False, fontsize="small", bbox_to_anchor=(0.5, y_anchor))
     
     def plot_sequence(axs, metrics, cases, label_func):
@@ -572,6 +576,7 @@ def main():
         pos_abs = [c for c in abs_cases if not sel_abs[c].endswith("_0")]
         zero_abs = [c for c in abs_cases if sel_abs[c].endswith("_0")]
 
+        fig3, axs3 = plt.subplots(4, 2, figsize=(14, 15), sharex="col")
         handles, labels = [], []
         if pos_abs:
             h3p, lab3p = plot_sequence(axs3[:, 0], metrics_pos, pos_abs, lambda c: c)
