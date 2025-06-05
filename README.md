@@ -24,5 +24,6 @@ Adjust configuration constants at the top of the script to change behaviour. In 
 - `absolute_worst_cases.txt`
 - `relative_worst_cases.txt`
 - `worst_case_report.txt`
+- `absolute_cases.png` – plots of absolute-rule winners (only when absolute rules run)
 - `positive_sequence.png`
 - `zero_sequence.png`
