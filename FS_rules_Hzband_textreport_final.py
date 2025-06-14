@@ -38,7 +38,7 @@ ENV_Z_SHIFT = 0.05               # ±10% impedance difference for envelope rule 
 MIN_REL_LIST = 5                 # Minimum number of relative worst cases
 MAX_REL_CASES = 5                # Max cases to keep per relative rule
 PEAK_PROMINENCE = None           # Prominence for find_peaks (None = no filtering)
-BOOK = Path("fs_seet.xlsx")     # Input workbook
+BOOK = Path("FS_sweep.xlsx")     # Input workbook
 ABS_OUT = Path("absolute_worst_cases.txt")
 REL_OUT = Path("relative_worst_cases.txt")
 FIG_POS = Path("positive_sequence.png")

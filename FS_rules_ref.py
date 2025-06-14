@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FS_rules_Hzband_textreport_final.py
+FS_rules_ref.py
 ────────────────────────────────────
 Analyze impedance sweeps and select worst cases.
 
