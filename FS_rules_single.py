@@ -197,16 +197,57 @@ def reserve_and_legend(fig, axs, handles, raw_labels, tag_map, expl_map, *, max_
     fig.legend(handles, labels, loc="lower center", ncol=ncols, frameon=False, fontsize="small", bbox_to_anchor=(0.5, y_anchor))
 
 
-def plot_sequence(axs, metrics, cases, label_func, harmonic, harmonics, bin_halfwidth, line_kwargs=None):
+def plot_sequence(
+    axs,
+    metrics,
+    cases,
+    label_func,
+    harmonic,
+    harmonics,
+    bin_halfwidth,
+    line_kwargs=None,
+    palette=None,
+    meta=None,
+):
     """Plot each metric for the given cases."""
-    for ax, (_, df, ylabel) in zip(axs, metrics):
+    for ax, (metric_name, df, ylabel) in zip(axs, metrics):
         for n in harmonics:
             ax.axvline(n, color="black", linestyle="--", linewidth=1.0, alpha=0.7)
             ax.axvline(n - bin_halfwidth, color="gray", linestyle=":", linewidth=0.8, alpha=0.7)
             ax.axvline(n + bin_halfwidth, color="gray", linestyle=":", linewidth=0.8, alpha=0.7)
         for c in cases:
             kw = line_kwargs(c) if line_kwargs else {}
-            ax.plot(harmonic, df[c], label=label_func(c), **kw)
+            color = palette.get(c) if palette else None
+            ax.plot(harmonic, df[c], label=label_func(c), color=color, **kw)
+            if meta is not None:
+                if metric_name == "X1":
+                    x = df[c].idxmin() / FUND
+                    y = meta.at[c, "X1_min"]
+                elif metric_name == "R1":
+                    x = df[c].idxmin() / FUND
+                    y = meta.at[c, "R1_min"]
+                elif metric_name == "X1/R1":
+                    x = meta.at[c, "f_pk"] / FUND
+                    y = meta.at[c, "Q1_pk"]
+                elif metric_name == "Z1":
+                    x = meta.at[c, "f_pk"] / FUND
+                    y = meta.at[c, "Z1_pk"]
+                elif metric_name == "X0":
+                    x = df[c].idxmin() / FUND
+                    y = meta.at[c, "X0_min"]
+                elif metric_name == "R0":
+                    x = df[c].idxmin() / FUND
+                    y = meta.at[c, "R0_min"]
+                elif metric_name == "X0/R0":
+                    x = meta.at[c, "f_pk"] / FUND
+                    y = meta.at[c, "Q0_pk"]
+                elif metric_name == "Z0":
+                    x = df[c].idxmax() / FUND
+                    y = meta.at[c, "Z0_pk"]
+                else:
+                    x = y = None
+                if x is not None and y is not None:
+                    ax.scatter(x, y, color=color, marker="o", s=25, zorder=5, label="_nolegend_")
         ax.set_ylabel(ylabel)
         ax.set_xticks(harmonics)
         ax.set_xticklabels([f"{n}H" for n in harmonics])
@@ -546,6 +587,9 @@ def plot_results(
     all_cases = list(peer_first_tag.keys())
     case_expl = {c: LABELS.get(peer_first_tag[c], "") for c in all_cases}
 
+    cmap = plt.cm.get_cmap("tab20")
+    palette = {c: cmap(i % cmap.N) for i, c in enumerate(sorted(all_cases))}
+
     pos_cases = [
         c
         for c in all_cases
@@ -582,6 +626,8 @@ def plot_results(
         harmonics,
         bin_halfwidth,
         line_kwargs,
+        palette,
+        meta,
     )
     reserve_and_legend(fig1, axs1, h1, labs1, peer_first_tag, case_expl)
     fig1.savefig(FIG_POS, dpi=300)
@@ -604,6 +650,8 @@ def plot_results(
         harmonics,
         bin_halfwidth,
         line_kwargs,
+        palette,
+        meta,
     )
     reserve_and_legend(fig2, axs2, h2, labs2, peer_first_tag, case_expl)
     fig2.savefig(FIG_ZERO, dpi=300)
@@ -629,6 +677,8 @@ def plot_results(
                 harmonics,
                 bin_halfwidth,
                 line_kwargs,
+                palette,
+                meta,
             )
             handles.extend(h3p)
             labels.extend(lab3p)
@@ -645,6 +695,8 @@ def plot_results(
                 harmonics,
                 bin_halfwidth,
                 line_kwargs,
+                palette,
+                meta,
             )
             handles.extend(h3z)
             labels.extend(lab3z)
