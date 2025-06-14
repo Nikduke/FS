@@ -217,8 +217,12 @@ def compute_metrics(freqs, cases, R1, X1, R0, X0):
     # 2.4 Min values and energy (area under |Z| curve)
     meta["X1_min"], meta["R1_min"] = X1.min(), R1.min()
     meta["X0_min"], meta["R0_min"] = X0.min(), R0.min()
-    meta["ΣZ1"] = pd.Series(np.trapz(Z1.to_numpy(), x=freqs, axis=0), index=cases)
-    meta["ΣZ0"] = pd.Series(np.trapz(Z0.to_numpy(), x=freqs, axis=0), index=cases)
+    meta["ΣZ1"] = pd.Series(
+        np.trapezoid(Z1.to_numpy(), x=freqs, axis=0), index=cases
+    )
+    meta["ΣZ0"] = pd.Series(
+        np.trapezoid(Z0.to_numpy(), x=freqs, axis=0), index=cases
+    )
 
     return meta, Z1, Z0, Q1, Q0
 
