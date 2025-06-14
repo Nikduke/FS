@@ -528,7 +528,7 @@ def plot_results(
         nrows = (n + ncols - 1) // ncols
         line_height = 0.03
         legend_height = nrows * line_height
-        bottom_margin = legend_height + 0.05
+        bottom_margin = min(legend_height + 0.05, 0.9)
         fig.subplots_adjust(bottom=bottom_margin)
         y_anchor = bottom_margin / 2
         fig.legend(handles, labels, loc="lower center", ncol=ncols, frameon=False, fontsize="small", bbox_to_anchor=(0.5, y_anchor))
