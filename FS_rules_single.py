@@ -13,6 +13,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
 import warnings
+import math
 
 # ───── CONFIGURATION PARAMETERS ──────────────────────────────────────────
 INCLUDE_NEGATIVE_PEAKS = True         # If True, also detect negative peaks (dips) in X/Z curves
@@ -168,33 +169,43 @@ def compute_metrics(
 
 
 def reserve_and_legend(fig, axs, handles, raw_labels, tag_map, expl_map, *, max_height=0.5):
-    """Adjust bottom margin and place a figure legend."""
+    """Adjust bottom margin and place a figure legend dynamically."""
     labels = [f"{c}: {tag_map[c]} – {expl_map[c]}" for c in raw_labels]
     n = len(labels)
-    ncols = 2
-    nrows = (n + ncols - 1) // ncols
+    if not n:
+        return
+
     line_height = 0.03
+    # Determine how many rows can fit within ``max_height`` and adjust columns
+    max_rows = max(1, int((max_height - 0.05) / line_height))
+    ncols = min(n, max(1, math.ceil(n / max_rows)))
+    nrows = math.ceil(n / ncols)
+
     legend_height = nrows * line_height
     bottom_margin = legend_height + 0.05
-    if max_height is not None:
-        bottom_margin = min(bottom_margin, max_height)
     top = 0.95
     default_bottom = 0.05
     base_frac = top - default_bottom
     new_frac = top - bottom_margin
-    clipped = bottom_margin < legend_height + 0.05
+
     if new_frac <= 0:
         warnings.warn("Legend too tall – results may be clipped")
         new_frac = 0.1
-        clipped = True
     if new_frac < base_frac:
         scale = base_frac / new_frac
         fig.set_figheight(fig.get_figheight() * scale)
+
     fig.subplots_adjust(top=top, bottom=bottom_margin, hspace=0.3)
-    if clipped:
-        warnings.warn("Legend truncated; labels may be clipped")
     y_anchor = bottom_margin / 2
-    fig.legend(handles, labels, loc="lower center", ncol=ncols, frameon=False, fontsize="small", bbox_to_anchor=(0.5, y_anchor))
+    fig.legend(
+        handles,
+        labels,
+        loc="lower center",
+        ncol=ncols,
+        frameon=False,
+        fontsize="small",
+        bbox_to_anchor=(0.5, y_anchor),
+    )
 
 
 def plot_sequence(axs, metrics, cases, label_func, harmonic, harmonics, bin_halfwidth, line_kwargs=None):
