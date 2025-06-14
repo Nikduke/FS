@@ -27,6 +27,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
 import warnings
+from fs_rules_core import load_data, compute_metrics, reserve_and_legend, plot_sequence
 
 # ───── CONFIGURATION PARAMETERS ──────────────────────────────────────────
 INCLUDE_NEGATIVE_PEAKS = True         # If True, also detect negative peaks (dips) in X/Z curves
@@ -115,117 +116,6 @@ LABELS = {
 ABS_ORDER = ["R1","R2","R3","R4","R1_0","R2_0","R3_0","R4_0","C3"]
 
 
-def load_data():
-    """Load the workbook and return frequency index and all dataframes."""
-    print(f"▶ 1. Loading {BOOK.name} …")
-    try:
-        R1 = pd.read_excel(BOOK, "R1", index_col=0)
-        X1 = pd.read_excel(BOOK, "X1", index_col=0)
-        R0 = pd.read_excel(BOOK, "R0", index_col=0)
-        X0 = pd.read_excel(BOOK, "X0", index_col=0)
-    except Exception as e:
-        sys.exit(f"❌ Cannot open {BOOK}: {e}")
-
-    freqs = R1.index.to_numpy()
-    cases = R1.columns
-    return freqs, cases, R1, X1, R0, X0
-
-
-def compute_metrics(freqs, cases, R1, X1, R0, X0):
-    """Compute base metrics and return them along with meta dataframe."""
-    print("▶ 2. Computing base metrics (Z1, Z0, Q1, Q0, etc.) …")
-    Z1 = np.hypot(R1, X1)
-    Q1 = (X1.abs() / R1.replace(0, np.nan)).fillna(np.inf)
-    Z0 = np.hypot(R0, X0)
-    Q0 = (X0.abs() / R0.replace(0, np.nan)).fillna(np.inf)
-
-    meta = pd.DataFrame(index=cases)
-
-    # 2.1 Global peaks (positive-sequence)
-    meta["Z1_pk"] = Z1.max()
-    meta["f_pk"] = Z1.idxmax()
-    meta["Q1_pk"] = [Q1.at[meta.at[c, "f_pk"], c] for c in cases]
-
-    # 2.2 Global peaks (zero-sequence)
-    meta["Z0_pk"] = Z0.max()
-    meta["Q0_pk"] = [Q0.at[meta.at[c, "f_pk"], c] for c in cases]
-
-    # 2.3 Harmonic-exact and harmonic-bin-peak metrics
-    for seq_label, Zdf, Xdf, Rdf in [
-        ("1", Z1, X1, R1),  # positive-sequence
-        ("0", Z0, X0, R0)   # zero-sequence
-    ]:
-        for n in range(2, MAX_HARMONIC + 1):
-            f_target = n * FUND
-            idx_nearest = np.abs(freqs - f_target).argmin()
-            col_exact_Z = f"Z{seq_label}_exact_{n}"
-            col_exact_X = f"X{seq_label}_exact_{n}"
-            col_exact_R = f"R{seq_label}_exact_{n}"
-            col_exact_Q = f"Q{seq_label}_exact_{n}"
-            meta[col_exact_Z] = Zdf.iloc[idx_nearest]
-            meta[col_exact_X] = Xdf.iloc[idx_nearest]
-            meta[col_exact_R] = Rdf.iloc[idx_nearest]
-            meta[col_exact_Q] = (
-                meta[col_exact_X].abs() / meta[col_exact_R].replace(0, np.nan)
-            ).fillna(np.inf)
-
-            mask = (freqs >= f_target - HARMONIC_BAND_HZ) & (
-                freqs <= f_target + HARMONIC_BAND_HZ
-            )
-            if mask.sum() == 0:
-                meta[f"Z{seq_label}_peak_{n}"] = 0.0
-                meta[f"X{seq_label}_peak_{n}"] = 0.0
-                meta[f"Q{seq_label}_peak_{n}"] = 0.0
-                continue
-
-            Z_band = Zdf.loc[mask, :]
-            X_band = Xdf.loc[mask, :]
-            R_band = Rdf.loc[mask, :]
-
-            Z_peak = pd.Series(index=cases, dtype=float)
-            X_at_peak = pd.Series(index=cases, dtype=float)
-            R_at_peak = pd.Series(index=cases, dtype=float)
-            Q_peak = pd.Series(index=cases, dtype=float)
-
-            for c in cases:
-                values = Z_band[c].to_numpy()
-                if INCLUDE_NEGATIVE_PEAKS:
-                    peaks_pos, _ = find_peaks(values, prominence=PEAK_PROMINENCE)
-                    peaks_neg, _ = find_peaks(-values, prominence=PEAK_PROMINENCE)
-                    peaks = np.concatenate([peaks_pos, peaks_neg])
-                else:
-                    peaks, _ = find_peaks(values, prominence=PEAK_PROMINENCE)
-
-                if peaks.size > 0:
-                    best_idx = peaks[np.argmax(values[peaks])]
-                    freq_of_peak = freqs[mask][best_idx]
-                    Z_peak[c] = values[best_idx]
-                    X_at_peak[c] = X_band.at[freq_of_peak, c]
-                    R_at_peak[c] = R_band.at[freq_of_peak, c]
-                    Q_peak[c] = abs(X_at_peak[c]) / (
-                        R_at_peak[c] if R_at_peak[c] != 0 else np.nan
-                    )
-                else:
-                    Z_peak[c] = 0.0
-                    X_at_peak[c] = 0.0
-                    R_at_peak[c] = np.nan
-                    Q_peak[c] = 0.0
-
-            meta[f"Z{seq_label}_peak_{n}"] = Z_peak
-            meta[f"X{seq_label}_peak_{n}"] = X_at_peak
-            meta[f"Q{seq_label}_peak_{n}"] = Q_peak.fillna(np.inf)
-
-    # 2.4 Min values and energy (area under |Z| curve)
-    meta["X1_min"], meta["R1_min"] = X1.min(), R1.min()
-    meta["X0_min"], meta["R0_min"] = X0.min(), R0.min()
-    meta["ΣZ1"] = pd.Series(
-        np.trapezoid(Z1.to_numpy(), x=freqs, axis=0), index=cases
-    )
-    meta["ΣZ0"] = pd.Series(
-        np.trapezoid(Z0.to_numpy(), x=freqs, axis=0), index=cases
-    )
-
-    return meta, Z1, Z0, Q1, Q0
 
 
 def apply_absolute_rules(meta, cases):
@@ -526,48 +416,11 @@ def plot_results(
     harmonics = np.arange(1, MAX_HARMONIC + 1)
     bin_halfwidth = HARMONIC_BAND_HZ / FUND
 
-    def reserve_and_legend(fig, axs, handles, raw_labels, tag_map, expl_map):
-        labels = [f"{c}: {tag_map[c]} – {expl_map[c]}" for c in raw_labels]
-        n = len(labels)
-        ncols = 2
-        nrows = (n + ncols - 1) // ncols
-        line_height = 0.03
-        legend_height = nrows * line_height
-        bottom_margin = legend_height + 0.05
-
-        top = 0.95
-        default_bottom = 0.05
-        base_frac = top - default_bottom
-        new_frac = top - bottom_margin
-        if new_frac <= 0:
-            warnings.warn("Legend too tall – results may be clipped")
-            new_frac = 0.1
-        if new_frac < base_frac:
-            scale = base_frac / new_frac
-            fig.set_figheight(fig.get_figheight() * scale)
-        fig.subplots_adjust(top=top, bottom=bottom_margin, hspace=0.3)
-        y_anchor = bottom_margin / 2
-        fig.legend(handles, labels, loc="lower center", ncol=ncols, frameon=False, fontsize="small", bbox_to_anchor=(0.5, y_anchor))
-
     def line_kwargs(case):
         tag = peer_first_tag.get(case, sel_abs.get(case, "")).lower()
         if "peak" in tag:
             return {"linestyle": "--", "linewidth": 1.0}
         return {"linestyle": "-", "linewidth": 1.5}
-
-    def plot_sequence(axs, metrics, cases, label_func):
-        for ax, (_, df, ylabel) in zip(axs, metrics):
-            for n in harmonics:
-                ax.axvline(n, color="black", linestyle="--", linewidth=1.0, alpha=0.7)
-                ax.axvline(n - bin_halfwidth, color="gray", linestyle=":", linewidth=0.8, alpha=0.7)
-                ax.axvline(n + bin_halfwidth, color="gray", linestyle=":", linewidth=0.8, alpha=0.7)
-            for c in cases:
-                ax.plot(harmonic, df[c], label=label_func(c), **line_kwargs(c))
-            ax.set_ylabel(ylabel)
-            ax.set_xticks(harmonics)
-            ax.set_xticklabels([f"{n}H" for n in harmonics])
-        axs[-1].set_xlabel("Harmonic Number (n)")
-        return axs[0].get_legend_handles_labels()
 
     print("▶ 9a. Positive-sequence plots …")
     metrics_pos = [
@@ -577,20 +430,16 @@ def plot_results(
         ("Z1", Z1, "Z1 (Ω)"),
     ]
     fig1, axs1 = plt.subplots(4, 1, figsize=(10, 14), sharex=True)
-    h1, labs1 = plot_sequence(axs1, metrics_pos, pos_cases, lambda c: c)
-    reserve_and_legend(fig1, axs1, h1, labs1, peer_first_tag, case_expl)
-    fig1.savefig(FIG_POS, dpi=300)
-    print(f"   ↳ saved {FIG_POS.name}")
-
-    print("▶ 9b. Zero-sequence plots …")
-    metrics_zero = [
-        ("X0", X0, "X0 (Ω)"),
-        ("R0", R0, "R0 (Ω)"),
-        ("X0/R0", X0.div(R0.replace(0, np.nan)), "X0/R0"),
-        ("Z0", Z0, "Z0 (Ω)"),
-    ]
-    fig1, axs1 = plt.subplots(4, 1, figsize=(10, 14), sharex=True)
-    h1, labs1 = plot_sequence(axs1, metrics_pos, pos_cases, lambda c: c)
+    h1, labs1 = plot_sequence(
+        axs1,
+        metrics_pos,
+        pos_cases,
+        lambda c: c,
+        harmonic,
+        harmonics,
+        bin_halfwidth,
+        line_kwargs,
+    )
     reserve_and_legend(fig1, axs1, h1, labs1, peer_first_tag, case_expl)
     fig1.savefig(FIG_POS, dpi=300)
     print(f"   ↳ saved {FIG_POS.name}")
@@ -603,7 +452,16 @@ def plot_results(
         ("Z0", Z0, "Z0 (Ω)"),
     ]
     fig2, axs2 = plt.subplots(4, 1, figsize=(8, 15), sharex=True)
-    h2, labs2 = plot_sequence(axs2, metrics_zero, zero_cases, lambda c: c)
+    h2, labs2 = plot_sequence(
+        axs2,
+        metrics_zero,
+        zero_cases,
+        lambda c: c,
+        harmonic,
+        harmonics,
+        bin_halfwidth,
+        line_kwargs,
+    )
     reserve_and_legend(fig2, axs2, h2, labs2, peer_first_tag, case_expl)
     fig2.savefig(FIG_ZERO, dpi=300)
     print(f"   ↳ saved {FIG_ZERO.name}")
@@ -619,14 +477,32 @@ def plot_results(
         fig3, axs3 = plt.subplots(4, 2, figsize=(14, 15), sharex="col")
         handles, labels = [], []
         if pos_abs:
-            h3p, lab3p = plot_sequence(axs3[:, 0], metrics_pos, pos_abs, lambda c: c)
+            h3p, lab3p = plot_sequence(
+                axs3[:, 0],
+                metrics_pos,
+                pos_abs,
+                lambda c: c,
+                harmonic,
+                harmonics,
+                bin_halfwidth,
+                line_kwargs,
+            )
             handles.extend(h3p)
             labels.extend(lab3p)
         else:
             for ax in axs3[:, 0]:
                 ax.axis("off")
         if zero_abs:
-            h3z, lab3z = plot_sequence(axs3[:, 1], metrics_zero, zero_abs, lambda c: c)
+            h3z, lab3z = plot_sequence(
+                axs3[:, 1],
+                metrics_zero,
+                zero_abs,
+                lambda c: c,
+                harmonic,
+                harmonics,
+                bin_halfwidth,
+                line_kwargs,
+            )
             handles.extend(h3z)
             labels.extend(lab3z)
         else:
@@ -691,8 +567,20 @@ def write_report(meta, peer_rule_cases, rel_order):
 
 
 def main():
-    freqs, cases, R1, X1, R0, X0 = load_data()
-    meta, Z1, Z0, Q1, Q0 = compute_metrics(freqs, cases, R1, X1, R0, X0)
+    freqs, cases, R1, X1, R0, X0 = load_data(BOOK)
+    meta, Z1, Z0, Q1, Q0 = compute_metrics(
+        freqs,
+        cases,
+        R1,
+        X1,
+        R0,
+        X0,
+        FUND,
+        MAX_HARMONIC,
+        HARMONIC_BAND_HZ,
+        INCLUDE_NEGATIVE_PEAKS,
+        PEAK_PROMINENCE,
+    )
     sel_abs = apply_absolute_rules(meta, cases)
     peer_rule_cases, peer_first_tag, rel_order = select_relative_cases(meta, cases, sel_abs)
 
