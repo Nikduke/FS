@@ -31,7 +31,7 @@ from fs_rules_core import load_data, compute_metrics, reserve_and_legend, plot_s
 
 # ───── CONFIGURATION PARAMETERS ──────────────────────────────────────────
 INCLUDE_NEGATIVE_PEAKS = True         # If True, also detect negative peaks (dips) in X/Z curves
-ENABLE_ABSOLUTE = False           # True = run R1–R4, R1_0–R4_0, C3; False = skip them
+ENABLE_ABSOLUTE = False           # True = run all absolute rules; False = skip them
 FUND = 60.0                      # Fundamental frequency [Hz]
 MAX_HARMONIC = 4                 # Highest harmonic to check (2..MAX_HARMONIC)
 HARMONIC_BAND_HZ = 5.0  # ±Hz band around each harmonic (e.g. ±5 Hz of n·FUND)
@@ -49,7 +49,7 @@ FIG_ZERO = Path("zero_sequence.png")
 FIG_ABS = Path("absolute_cases.png")
 
 # Comments on configuration:
-#  - ENABLE_ABSOLUTE: set to False to skip all absolute‐rule logic (R1–R4, R1_0–R4_0, C3).
+#  - ENABLE_ABSOLUTE: set to False to skip all absolute‐rule logic.
 #  - FUND: if your system is 50 Hz, change to 50.0.
 #  - MAX_HARMONIC: number of harmonics to check (e.g. 4 = 2nd, 3rd, 4th).
 #  - HARMONIC_BAND_HZ: window size around each harmonic. With FUND=60 and n=2,
@@ -62,16 +62,16 @@ FIG_ABS = Path("absolute_cases.png")
 # Build LABELS dictionary including new exact/peak tags
 LABELS = {
     # Absolute rules (positive)
-    "R1":   "Largest |Z1| at 2H/3H (bin peak, |X1|≤0.05·|Z1|)",
-    "R2":   "Highest Q1·|Z1| peak (Z1_pk>5·Z_ref & Q1>3)",
-    "R3":   "Deep capacitive well1 (X1_min<−4·X_ref, R1_min<10)",
-    "R4":   "Low-freq Z1 (<0.8·FUND) with Q1>2",
+    "Z1_PEAK23H":    "Largest |Z1| at 2H/3H (bin peak, |X1|≤0.05·|Z1|)",
+    "Z1_HIGH_QPK":   "Highest Q1·|Z1| peak (Z1_pk>5·Z_ref & Q1>3)",
+    "Z1_CAP_WELL":   "Deep capacitive well1 (X1_min<−4·X_ref, R1_min<10)",
+    "Z1_LOWFREQ":    "Low-freq Z1 (<0.8·FUND) with Q1>2",
     # Absolute rules (zero)
-    "R1_0": "Largest |Z0| at 2H/3H (bin peak, |X0|≤0.05·|Z0|)",
-    "R2_0": "Highest Q0·|Z0| peak (Z0_pk>5·Z_ref & Q0>3)",
-    "R3_0": "Deep capacitive well0 (X0_min<−4·X_ref, R0_min<10)",
-    "R4_0": "Low-freq Z0 (<0.8·FUND) with Q0>2",
-    "C3":   "Envelope: same f_pk, |Z1_pk| differs >10%",
+    "Z0_PEAK23H_0":  "Largest |Z0| at 2H/3H (bin peak, |X0|≤0.05·|Z0|)",
+    "Z0_HIGH_QPK_0": "Highest Q0·|Z0| peak (Z0_pk>5·Z_ref & Q0>3)",
+    "Z0_CAP_WELL_0": "Deep capacitive well0 (X0_min<−4·X_ref, R0_min<10)",
+    "Z0_LOWFREQ_0":  "Low-freq Z0 (<0.8·FUND) with Q0>2",
+    "C3":             "Envelope: same f_pk, |Z1_pk| differs >10%",
 
     # Peer metrics (perfect harmonic exactly)
     # Positive exact
@@ -113,7 +113,17 @@ LABELS = {
     "TopUp": "Peer-top-up by ladder score"
 }
 
-ABS_ORDER = ["R1","R2","R3","R4","R1_0","R2_0","R3_0","R4_0","C3"]
+ABS_ORDER = [
+    "Z1_PEAK23H",
+    "Z1_HIGH_QPK",
+    "Z1_CAP_WELL",
+    "Z1_LOWFREQ",
+    "Z0_PEAK23H_0",
+    "Z0_HIGH_QPK_0",
+    "Z0_CAP_WELL_0",
+    "Z0_LOWFREQ_0",
+    "C3",
+]
 
 
 
@@ -135,18 +145,18 @@ def apply_absolute_rules(meta, cases):
             Zpeak = max(Z2p, Z3p)
             X_at_Zpeak = X2p if Z2p >= Z3p else X3p
             if (Zpeak > 5 * Z_REF) and (X_at_Zpeak <= 0.05 * Zpeak):
-                tags_abs[c].append("R1")
+                tags_abs[c].append("Z1_PEAK23H")
 
             Zpk1, Qpk1 = meta.at[c, "Z1_pk"], meta.at[c, "Q1_pk"]
             if (Zpk1 > 5 * Z_REF) and (Qpk1 > 3):
-                tags_abs[c].append("R2")
+                tags_abs[c].append("Z1_HIGH_QPK")
 
             Xmin1, Rmin1 = meta.at[c, "X1_min"], meta.at[c, "R1_min"]
             if (Xmin1 < -4 * X_REF) and (Rmin1 < 10):
-                tags_abs[c].append("R3")
+                tags_abs[c].append("Z1_CAP_WELL")
 
             if (fpk < 0.8 * FUND) and (Qpk1 > 2):
-                tags_abs[c].append("R4")
+                tags_abs[c].append("Z1_LOWFREQ")
 
             Z2p0 = meta.at[c, "Z0_peak_2"]
             Z3p0 = meta.at[c, "Z0_peak_3"]
@@ -155,18 +165,18 @@ def apply_absolute_rules(meta, cases):
             Zpeak0 = max(Z2p0, Z3p0)
             X_at_Zpeak0 = X2p0 if Z2p0 >= Z3p0 else X3p0
             if (Zpeak0 > 5 * Z_REF) and (X_at_Zpeak0 <= 0.05 * Zpeak0):
-                tags_abs[c].append("R1_0")
+                tags_abs[c].append("Z0_PEAK23H_0")
 
             Zpk0, Qpk0 = meta.at[c, "Z0_pk"], meta.at[c, "Q0_pk"]
             if (Zpk0 > 5 * Z_REF) and (Qpk0 > 3):
-                tags_abs[c].append("R2_0")
+                tags_abs[c].append("Z0_HIGH_QPK_0")
 
             Xmin0, Rmin0 = meta.at[c, "X0_min"], meta.at[c, "R0_min"]
             if (Xmin0 < -4 * X_REF) and (Rmin0 < 10):
-                tags_abs[c].append("R3_0")
+                tags_abs[c].append("Z0_CAP_WELL_0")
 
             if (fpk < 0.8 * FUND) and (Qpk0 > 2):
-                tags_abs[c].append("R4_0")
+                tags_abs[c].append("Z0_LOWFREQ_0")
 
         print("   Hit counts:")
         for rule in ABS_ORDER[:-1]:
@@ -179,20 +189,20 @@ def apply_absolute_rules(meta, cases):
             if not candidates:
                 continue
 
-            if rule in ("R1", "R1_0"):
-                key_peak = "Z1_peak_2" if rule == "R1" else "Z0_peak_2"
+            if rule in ("Z1_PEAK23H", "Z0_PEAK23H_0"):
+                key_peak = "Z1_peak_2" if rule == "Z1_PEAK23H" else "Z0_peak_2"
                 Zvals2 = meta.loc[candidates, key_peak]
                 Zvals3 = meta.loc[candidates, key_peak.replace("2", "3")]
                 Z_combined = pd.DataFrame({"2nd": Zvals2, "3rd": Zvals3}).max(axis=1)
                 winner = Z_combined.idxmax()
             else:
                 key_map = {
-                    "R2": "Z1_pk",
-                    "R3": "X1_min",
-                    "R4": "f_pk",
-                    "R2_0": "Z0_pk",
-                    "R3_0": "X0_min",
-                    "R4_0": "f_pk",
+                    "Z1_HIGH_QPK": "Z1_pk",
+                    "Z1_CAP_WELL": "X1_min",
+                    "Z1_LOWFREQ": "f_pk",
+                    "Z0_HIGH_QPK_0": "Z0_pk",
+                    "Z0_CAP_WELL_0": "X0_min",
+                    "Z0_LOWFREQ_0": "f_pk",
                 }
                 key = key_map[rule]
                 if "min" in key:
