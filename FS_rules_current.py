@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FS_rules_Hzband_textreport_final.py
+FS_rules_ref.py
 ────────────────────────────────────
 Analyze impedance sweeps and select worst cases.
 
@@ -38,7 +38,7 @@ Z_REF, X_REF = 100.0, 50.0       # Reference impedances [Ω]
 CLUSTER_BAND = 0.03              # ±3% clustering for envelope rule (C3)
 ENV_Z_SHIFT = float(os.getenv("ENV_Z_SHIFT", "0.05"))  # Fractional |Z| difference for C3
 MIN_REL_LIST = 5                 # Minimum number of relative worst cases
-MAX_REL_CASES = 5                # Max cases to keep per relative rule
+MAX_REL_CASES = 2                # Max cases to keep per relative rule
 PEAK_PROMINENCE = None           # Prominence for find_peaks (None = no filtering)
 BOOK = Path("FS_sweep.xlsx")     # Input workbook
 ABS_OUT = Path("absolute_worst_cases.txt")
@@ -575,6 +575,19 @@ def plot_results(
         ("R1", R1, "R1 (Ω)"),
         ("X1/R1", X1.div(R1.replace(0, np.nan)), "X1/R1"),
         ("Z1", Z1, "Z1 (Ω)"),
+    ]
+    fig1, axs1 = plt.subplots(4, 1, figsize=(10, 14), sharex=True)
+    h1, labs1 = plot_sequence(axs1, metrics_pos, pos_cases, lambda c: c)
+    reserve_and_legend(fig1, axs1, h1, labs1, peer_first_tag, case_expl)
+    fig1.savefig(FIG_POS, dpi=300)
+    print(f"   ↳ saved {FIG_POS.name}")
+
+    print("▶ 9b. Zero-sequence plots …")
+    metrics_zero = [
+        ("X0", X0, "X0 (Ω)"),
+        ("R0", R0, "R0 (Ω)"),
+        ("X0/R0", X0.div(R0.replace(0, np.nan)), "X0/R0"),
+        ("Z0", Z0, "Z0 (Ω)"),
     ]
     fig1, axs1 = plt.subplots(4, 1, figsize=(10, 14), sharex=True)
     h1, labs1 = plot_sequence(axs1, metrics_pos, pos_cases, lambda c: c)
