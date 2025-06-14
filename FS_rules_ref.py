@@ -227,16 +227,11 @@ def apply_absolute_rules(meta, cases):
     return sel_abs
 
 
-def select_relative_cases(meta, cases, sel_abs):
-    """Build relative peer-metric mapping and return rule cases and order."""
-    print("▶ 6. Building relative peer-metric list …")
-    peer_pool = [c for c in cases if c not in sel_abs]
-    peer_rule_cases = {}
-    peer_first_tag = {}
-
-    rel_order = []
+def build_relative_order():
+    """Return the sequence of relative-rule tags."""
+    order = []
     for n in range(2, MAX_HARMONIC + 1):
-        rel_order.extend(
+        order.extend(
             [
                 f"H-Z_exact({n}H)",
                 f"H-X_exact({n}H)",
@@ -247,7 +242,7 @@ def select_relative_cases(meta, cases, sel_abs):
             ]
         )
     for n in range(2, MAX_HARMONIC + 1):
-        rel_order.extend(
+        order.extend(
             [
                 f"H-Z0_exact({n}H)",
                 f"H-X0_exact({n}H)",
@@ -257,7 +252,7 @@ def select_relative_cases(meta, cases, sel_abs):
                 f"H-Q0_peak({n}H)",
             ]
         )
-    rel_order.extend([
+    order.extend([
         "Q-R",
         "R-Min",
         "E-Zero",
@@ -268,7 +263,13 @@ def select_relative_cases(meta, cases, sel_abs):
         "ΣZ0",
         "TopUp",
     ])
+    return order
 
+
+def collect_top_cases(meta, peer_pool):
+    """Return mapping of rule -> cases and first-tag map."""
+    peer_rule_cases = {}
+    peer_first_tag = {}
     for n in range(2, MAX_HARMONIC + 1):
         Z_exact = meta[f"Z1_exact_{n}"].loc[peer_pool]
         X_exact = meta[f"X1_exact_{n}"].abs().loc[peer_pool]
@@ -359,13 +360,11 @@ def select_relative_cases(meta, cases, sel_abs):
             for c in cases_sorted:
                 peer_rule_cases.setdefault(tag, []).append(c)
                 peer_first_tag.setdefault(c, tag)
+    return peer_rule_cases, peer_first_tag
 
-    total_selected = sum(len(v) for v in peer_rule_cases.values())
-    print(f"   Initial peer count = {total_selected}")
-    for tag in rel_order:
-        for c in peer_rule_cases.get(tag, []):
-            print(f"    {tag} → {c}")
 
+def apply_topup(meta, peer_rule_cases, peer_first_tag, rel_order):
+    """Add additional cases so the list meets MIN_REL_LIST."""
     ladder = (
         meta["Z1_pk"] / Z_REF
         + meta[[f"Z1_peak_{n}" for n in range(2, MAX_HARMONIC + 1)]].max(axis=1) / Z_REF
@@ -381,7 +380,21 @@ def select_relative_cases(meta, cases, sel_abs):
         peer_first_tag.setdefault(nxt, "TopUp")
         print(f"    TopUp → {nxt} (score={ladder[nxt]:.2f})")
     print(f"   Final peer count = {len(peer_first_tag)}")
+    return peer_rule_cases, peer_first_tag
 
+
+def select_relative_cases(meta, cases, sel_abs):
+    """Build relative peer-metric mapping and return rule cases and order."""
+    print("▶ 6. Building relative peer-metric list …")
+    peer_pool = [c for c in cases if c not in sel_abs]
+    rel_order = build_relative_order()
+    peer_rule_cases, peer_first_tag = collect_top_cases(meta, peer_pool)
+    total_selected = sum(len(v) for v in peer_rule_cases.values())
+    print(f"   Initial peer count = {total_selected}")
+    for tag in rel_order:
+        for c in peer_rule_cases.get(tag, []):
+            print(f"    {tag} → {c}")
+    peer_rule_cases, peer_first_tag = apply_topup(meta, peer_rule_cases, peer_first_tag, rel_order)
     return peer_rule_cases, peer_first_tag, rel_order
 
 

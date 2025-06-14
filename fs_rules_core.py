@@ -23,41 +23,38 @@ def load_data(book: Path):
     return freqs, cases, R1, X1, R0, X0
 
 
-def compute_metrics(
-    freqs,
-    cases,
-    R1,
-    X1,
-    R0,
-    X0,
-    FUND: float,
-    MAX_HARMONIC: int,
-    HARMONIC_BAND_HZ: float,
-    INCLUDE_NEGATIVE_PEAKS: bool,
-    PEAK_PROMINENCE,
-):
-    """Compute base metrics and return them along with a meta dataframe."""
-    print("\u25B6 2. Computing base metrics (Z1, Z0, Q1, Q0, etc.) …")
-    Z1 = np.hypot(R1, X1)
-    Q1 = (X1.abs() / R1.replace(0, np.nan)).fillna(np.inf)
-    Z0 = np.hypot(R0, X0)
-    Q0 = (X0.abs() / R0.replace(0, np.nan)).fillna(np.inf)
-
+def compute_global_peaks(Z1, Q1, Z0, Q0):
+    """Return dataframe with global peak metrics for each case."""
+    cases = Z1.columns
     meta = pd.DataFrame(index=cases)
-
-    # 2.1 Global peaks (positive-sequence)
     meta["Z1_pk"] = Z1.max()
     meta["f_pk"] = Z1.idxmax()
     meta["Q1_pk"] = [Q1.at[meta.at[c, "f_pk"], c] for c in cases]
-
-    # 2.2 Global peaks (zero-sequence)
     meta["Z0_pk"] = Z0.max()
     meta["Q0_pk"] = [Q0.at[meta.at[c, "f_pk"], c] for c in cases]
+    return meta
 
-    # 2.3 Harmonic-exact and harmonic-bin-peak metrics
+
+def compute_harmonic_metrics(
+    freqs,
+    cases,
+    Z1,
+    X1,
+    R1,
+    Z0,
+    X0,
+    R0,
+    FUND,
+    MAX_HARMONIC,
+    HARMONIC_BAND_HZ,
+    INCLUDE_NEGATIVE_PEAKS,
+    PEAK_PROMINENCE,
+):
+    """Return dataframe with harmonic exact/peak metrics for each case."""
+    meta = pd.DataFrame(index=cases)
     for seq_label, Zdf, Xdf, Rdf in [
-        ("1", Z1, X1, R1),  # positive-sequence
-        ("0", Z0, X0, R0),  # zero-sequence
+        ("1", Z1, X1, R1),
+        ("0", Z0, X0, R0),
     ]:
         for n in range(2, MAX_HARMONIC + 1):
             f_target = n * FUND
@@ -118,13 +115,58 @@ def compute_metrics(
             meta[f"Z{seq_label}_peak_{n}"] = Z_peak
             meta[f"X{seq_label}_peak_{n}"] = X_at_peak
             meta[f"Q{seq_label}_peak_{n}"] = Q_peak.fillna(np.inf)
+    return meta
 
-    # 2.4 Min values and energy (area under |Z| curve)
+
+def compute_energy_metrics(freqs, cases, Z1, X1, R1, Z0, X0, R0):
+    """Return dataframe with energy, minima, etc."""
+    meta = pd.DataFrame(index=cases)
     meta["X1_min"], meta["R1_min"] = X1.min(), R1.min()
     meta["X0_min"], meta["R0_min"] = X0.min(), R0.min()
     trapz = getattr(np, "trapezoid", np.trapz)
     meta["ΣZ1"] = pd.Series(trapz(Z1.to_numpy(), x=freqs, axis=0), index=cases)
     meta["ΣZ0"] = pd.Series(trapz(Z0.to_numpy(), x=freqs, axis=0), index=cases)
+    return meta
+
+
+def compute_metrics(
+    freqs,
+    cases,
+    R1,
+    X1,
+    R0,
+    X0,
+    FUND: float,
+    MAX_HARMONIC: int,
+    HARMONIC_BAND_HZ: float,
+    INCLUDE_NEGATIVE_PEAKS: bool,
+    PEAK_PROMINENCE,
+):
+    """Compute base metrics and return them along with a meta dataframe."""
+    print("\u25B6 2. Computing base metrics (Z1, Z0, Q1, Q0, etc.) …")
+    Z1 = np.hypot(R1, X1)
+    Q1 = (X1.abs() / R1.replace(0, np.nan)).fillna(np.inf)
+    Z0 = np.hypot(R0, X0)
+    Q0 = (X0.abs() / R0.replace(0, np.nan)).fillna(np.inf)
+
+    meta = compute_global_peaks(Z1, Q1, Z0, Q0)
+    meta_h = compute_harmonic_metrics(
+        freqs,
+        cases,
+        Z1,
+        X1,
+        R1,
+        Z0,
+        X0,
+        R0,
+        FUND,
+        MAX_HARMONIC,
+        HARMONIC_BAND_HZ,
+        INCLUDE_NEGATIVE_PEAKS,
+        PEAK_PROMINENCE,
+    )
+    meta_e = compute_energy_metrics(freqs, cases, Z1, X1, R1, Z0, X0, R0)
+    meta = pd.concat([meta, meta_h, meta_e], axis=1)
 
     return meta, Z1, Z0, Q1, Q0
 
