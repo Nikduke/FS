@@ -26,6 +26,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
+import warnings
 
 # ───── CONFIGURATION PARAMETERS ──────────────────────────────────────────
 INCLUDE_NEGATIVE_PEAKS = True         # If True, also detect negative peaks (dips) in X/Z curves
@@ -37,7 +38,7 @@ Z_REF, X_REF = 100.0, 50.0       # Reference impedances [Ω]
 CLUSTER_BAND = 0.03              # ±3% clustering for envelope rule (C3)
 ENV_Z_SHIFT = float(os.getenv("ENV_Z_SHIFT", "0.05"))  # Fractional |Z| difference for C3
 MIN_REL_LIST = 5                 # Minimum number of relative worst cases
-MAX_REL_CASES = 5                # Max cases to keep per relative rule
+MAX_REL_CASES = 2                # Max cases to keep per relative rule
 PEAK_PROMINENCE = None           # Prominence for find_peaks (None = no filtering)
 BOOK = Path("FS_sweep.xlsx")     # Input workbook
 ABS_OUT = Path("absolute_worst_cases.txt")
@@ -532,12 +533,27 @@ def plot_results(
         nrows = (n + ncols - 1) // ncols
         line_height = 0.03
         legend_height = nrows * line_height
-        bottom_margin = min(legend_height + 0.05, 0.5)
-        if bottom_margin < legend_height + 0.05:
-            print("   [WARN] Legend truncated: too many cases for available space")
-        fig.subplots_adjust(top=0.95, bottom=bottom_margin, hspace=0.3)
+        bottom_margin = legend_height + 0.05
+
+        top = 0.95
+        default_bottom = 0.05
+        base_frac = top - default_bottom
+        new_frac = top - bottom_margin
+        if new_frac <= 0:
+            warnings.warn("Legend too tall – results may be clipped")
+            new_frac = 0.1
+        if new_frac < base_frac:
+            scale = base_frac / new_frac
+            fig.set_figheight(fig.get_figheight() * scale)
+        fig.subplots_adjust(top=top, bottom=bottom_margin, hspace=0.3)
         y_anchor = bottom_margin / 2
         fig.legend(handles, labels, loc="lower center", ncol=ncols, frameon=False, fontsize="small", bbox_to_anchor=(0.5, y_anchor))
+
+    def line_kwargs(case):
+        tag = peer_first_tag.get(case, sel_abs.get(case, "")).lower()
+        if "peak" in tag:
+            return {"linestyle": "--", "linewidth": 1.0}
+        return {"linestyle": "-", "linewidth": 1.5}
 
     def plot_sequence(axs, metrics, cases, label_func):
         for ax, (_, df, ylabel) in zip(axs, metrics):
@@ -546,7 +562,7 @@ def plot_results(
                 ax.axvline(n - bin_halfwidth, color="gray", linestyle=":", linewidth=0.8, alpha=0.7)
                 ax.axvline(n + bin_halfwidth, color="gray", linestyle=":", linewidth=0.8, alpha=0.7)
             for c in cases:
-                ax.plot(harmonic, df[c], label=label_func(c))
+                ax.plot(harmonic, df[c], label=label_func(c), **line_kwargs(c))
             ax.set_ylabel(ylabel)
             ax.set_xticks(harmonics)
             ax.set_xticklabels([f"{n}H" for n in harmonics])
@@ -559,6 +575,19 @@ def plot_results(
         ("R1", R1, "R1 (Ω)"),
         ("X1/R1", X1.div(R1.replace(0, np.nan)), "X1/R1"),
         ("Z1", Z1, "Z1 (Ω)"),
+    ]
+    fig1, axs1 = plt.subplots(4, 1, figsize=(10, 14), sharex=True)
+    h1, labs1 = plot_sequence(axs1, metrics_pos, pos_cases, lambda c: c)
+    reserve_and_legend(fig1, axs1, h1, labs1, peer_first_tag, case_expl)
+    fig1.savefig(FIG_POS, dpi=300)
+    print(f"   ↳ saved {FIG_POS.name}")
+
+    print("▶ 9b. Zero-sequence plots …")
+    metrics_zero = [
+        ("X0", X0, "X0 (Ω)"),
+        ("R0", R0, "R0 (Ω)"),
+        ("X0/R0", X0.div(R0.replace(0, np.nan)), "X0/R0"),
+        ("Z0", Z0, "Z0 (Ω)"),
     ]
     fig1, axs1 = plt.subplots(4, 1, figsize=(10, 14), sharex=True)
     h1, labs1 = plot_sequence(axs1, metrics_pos, pos_cases, lambda c: c)
