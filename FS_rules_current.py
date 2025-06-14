@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+!/usr/bin/env python3
 """
 FS_rules_Hzband_textreport_final.py
 ────────────────────────────────────
@@ -80,212 +80,7 @@ LABELS = {
     **{f"H-Z_peak({n}H)": f"Max |Z1| peak in ±{HARMONIC_BAND_HZ}Hz of {n}·FUND"
       for n in range(2, MAX_HARMONIC+1)},
     **{f"H-X_peak({n}H)": f"Max |X1| peak in ±{HARMONIC_BAND_HZ}Hz of {n}·FUND"
-      for n in range(2, MAX_HARMONIC+1)},
-    **{f"H-Q_peak({n}H)": f"Max Q1 peak in ±{HARMONIC_BAND_HZ}Hz of {n}·FUND"
-      for n in range(2, MAX_HARMONIC+1)},
-
-    # Zero exact
-    **{f"H-Z0_exact({n}H)": f"Max |Z0| exactly at {n}·FUND" for n in range(2, MAX_HARMONIC+1)},
-    **{f"H-X0_exact({n}H)": f"Max |X0| exactly at {n}·FUND" for n in range(2, MAX_HARMONIC+1)},
-    **{f"H-Q0_exact({n}H)": f"Max Q0 exactly at {n}·FUND" for n in range(2, MAX_HARMONIC+1)},
-    # Zero bin‐peak
-    **{f"H-Z0_peak({n}H)": f"Max |Z0| peak in ±{HARMONIC_BAND_HZ}Hz of {n}·FUND"
-      for n in range(2, MAX_HARMONIC+1)},
-    **{f"H-X0_peak({n}H)": f"Max |X0| peak in ±{HARMONIC_BAND_HZ}Hz of {n}·FUND"
-      for n in range(2, MAX_HARMONIC+1)},
-    **{f"H-Q0_peak({n}H)": f"Max Q0 peak in ±{HARMONIC_BAND_HZ}Hz of {n}·FUND"
-      for n in range(2, MAX_HARMONIC+1)},
-
-    # Global peer metrics
-    "Q-R":   "Highest Q1 at any peak",
-    "R-Min": "Minimum R1 over all freq",
-    "E-Zero":"Earliest X1 zero crossing / min freq",
-    "ΣZ":    "Largest Σ|Z1| (energy)",
-
-    "Q0-R":   "Highest Q0 at any peak",
-    "R0-Min": "Minimum R0 over all freq",
-    "E-Zero0":"Earliest X0 zero crossing / min freq",
-    "ΣZ0":    "Largest Σ|Z0| (energy)",
-
-    # Fallback
-    "TopUp": "Peer-top-up by ladder score"
-}
-
-ABS_ORDER = ["R1","R2","R3","R4","R1_0","R2_0","R3_0","R4_0","C3"]
-REL_ORDER = []  # will be populated below
-
-def main():
-    
-    # ───── 1. Load Excel Workbook ────────────────────────────────────────────
-    print(f"▶ 1. Loading {BOOK.name} …")
-    try:
-        R1 = pd.read_excel(BOOK, "R1", index_col=0)
-        X1 = pd.read_excel(BOOK, "X1", index_col=0)
-        R0 = pd.read_excel(BOOK, "R0", index_col=0)
-        X0 = pd.read_excel(BOOK, "X0", index_col=0)
-    except Exception as e:
-        sys.exit(f"❌ Cannot open {BOOK}: {e}")
-    
-    freqs = R1.index.to_numpy()
-    cases = R1.columns
-    
-    # ───── 2. Compute Base Metrics ────────────────────────────────────────────
-    print("▶ 2. Computing base metrics (Z1, Z0, Q1, Q0, etc.) …")
-    Z1 = np.hypot(R1, X1)
-    Q1 = (X1.abs() / R1.replace(0, np.nan)).fillna(np.inf)
-    Z0 = np.hypot(R0, X0)
-    Q0 = (X0.abs() / R0.replace(0, np.nan)).fillna(np.inf)
-    
-    meta = pd.DataFrame(index=cases)
-    
-    # 2.1 Global peaks (positive‐sequence)
-    meta["Z1_pk"] = Z1.max()
-    meta["f_pk"] = Z1.idxmax()
-    meta["Q1_pk"] = [Q1.at[meta.at[c, "f_pk"], c] for c in cases]
-    
-    # 2.2 Global peaks (zero‐sequence)
-    meta["Z0_pk"] = Z0.max()
-    meta["Q0_pk"] = [Q0.at[meta.at[c, "f_pk"], c] for c in cases]
-    
-    # 2.3 Harmonic‐exact and harmonic‐bin‐peak metrics
-    for seq_label, Zdf, Xdf, Rdf in [
-        ("1", Z1, X1, R1),  # positive‐sequence
-        ("0", Z0, X0, R0)   # zero‐sequence
-    ]:
-        for n in range(2, MAX_HARMONIC + 1):
-            f_target = n * FUND
-            # 2.3.a Exact‐harmonic point
-            idx_nearest = np.abs(freqs - f_target).argmin()
-            f_exact = freqs[idx_nearest]
-            col_exact_Z = f"Z{seq_label}_exact_{n}"
-            col_exact_X = f"X{seq_label}_exact_{n}"
-            col_exact_R = f"R{seq_label}_exact_{n}"
-            col_exact_Q = f"Q{seq_label}_exact_{n}"
-            meta[col_exact_Z] = Zdf.iloc[idx_nearest]
-            meta[col_exact_X] = Xdf.iloc[idx_nearest]
-            meta[col_exact_R] = Rdf.iloc[idx_nearest]
-            meta[col_exact_Q] = (meta[col_exact_X].abs() / meta[col_exact_R].replace(0, np.nan)).fillna(np.inf)
-    
-            # 2.3.b Bin‐peak in ±HARMONIC_BAND_HZ
-            mask = (freqs >= f_target - HARMONIC_BAND_HZ) & (freqs <= f_target + HARMONIC_BAND_HZ)
-            if mask.sum() == 0:
-                meta[f"Z{seq_label}_peak_{n}"] = 0.0
-                meta[f"X{seq_label}_peak_{n}"] = 0.0
-                meta[f"Q{seq_label}_peak_{n}"] = 0.0
-                continue
-    
-            Z_band = Zdf.loc[mask, :]
-            X_band = Xdf.loc[mask, :]
-            R_band = Rdf.loc[mask, :]
-    
-            Z_peak = pd.Series(index=cases, dtype=float)
-            X_at_peak = pd.Series(index=cases, dtype=float)
-            R_at_peak = pd.Series(index=cases, dtype=float)
-            Q_peak = pd.Series(index=cases, dtype=float)
-    
-            for c in cases:
-    
-                values = Z_band[c].to_numpy()
-                if INCLUDE_NEGATIVE_PEAKS:
-                    peaks_pos, _ = find_peaks(values, prominence=PEAK_PROMINENCE)
-                    peaks_neg, _ = find_peaks(-values, prominence=PEAK_PROMINENCE)
-                    peaks = np.concatenate([peaks_pos, peaks_neg])
-                else:
-                    peaks, _ = find_peaks(values, prominence=PEAK_PROMINENCE)
-    
-                if peaks.size > 0:
-                    best_idx = peaks[np.argmax(values[peaks])]
-                    freq_of_peak = freqs[mask][best_idx]
-                    Z_peak[c] = values[best_idx]
-                    X_at_peak[c] = X_band.at[freq_of_peak, c]
-                    R_at_peak[c] = R_band.at[freq_of_peak, c]
-                    Q_peak[c] = abs(X_at_peak[c]) / (R_at_peak[c] if R_at_peak[c] != 0 else np.nan)
-                else:
-                    Z_peak[c] = 0.0
-                    X_at_peak[c] = 0.0
-                    R_at_peak[c] = np.nan
-                    Q_peak[c] = 0.0
-    
-            meta[f"Z{seq_label}_peak_{n}"] = Z_peak
-            meta[f"X{seq_label}_peak_{n}"] = X_at_peak
-            meta[f"Q{seq_label}_peak_{n}"] = Q_peak.fillna(np.inf)
-    
-    # 2.4 Min values and energy (area under |Z| curve)
-    meta["X1_min"], meta["R1_min"] = X1.min(), R1.min()
-    meta["X0_min"], meta["R0_min"] = X0.min(), R0.min()
-    meta["ΣZ1"] = pd.Series(np.trapz(Z1.to_numpy(), x=freqs, axis=0), index=cases)
-    meta["ΣZ0"] = pd.Series(np.trapz(Z0.to_numpy(), x=freqs, axis=0), index=cases)
-    
-    # ───── 3–5. Absolute Rules (Wrapped by ENABLE_ABSOLUTE) ────────────────
-    tags_abs = {c: [] for c in cases}
-    sel_abs = {}
-    
-    if ENABLE_ABSOLUTE:
-        print("▶ 3. Applying absolute rules …")
-        for c in cases:
-            fpk = meta.at[c, "f_pk"]
-    
-            # R1: Largest |Z1| at 2H/3H harmonic BIN peaks, with |X1_peak| ≤ 0.05·Z_peak
-            Z2p = meta.at[c, "Z1_peak_2"]
-            Z3p = meta.at[c, "Z1_peak_3"]
-            X2p = abs(meta.at[c, "X1_peak_2"])
-            X3p = abs(meta.at[c, "X1_peak_3"])
-            Zpeak = max(Z2p, Z3p)
-            X_at_Zpeak = X2p if Z2p >= Z3p else X3p
-            if (Zpeak > 5 * Z_REF) and (X_at_Zpeak <= 0.05 * Zpeak):
-                tags_abs[c].append("R1")
-    
-            # R2: Highest global |Z1_pk| with Q1_pk > 3
-            Zpk1, Qpk1 = meta.at[c, "Z1_pk"], meta.at[c, "Q1_pk"]
-            if (Zpk1 > 5 * Z_REF) and (Qpk1 > 3):
-                tags_abs[c].append("R2")
-    
-            # R3: Deep capacitive well: X1_min < -4·X_REF and R1_min < 10
-            Xmin1, Rmin1 = meta.at[c, "X1_min"], meta.at[c, "R1_min"]
-            if (Xmin1 < -4 * X_REF) and (Rmin1 < 10):
-                tags_abs[c].append("R3")
-    
-            # R4: Low‐freq peak: f_pk < 0.8·FUND with Q1_pk > 2
-            if (fpk < 0.8 * FUND) and (Qpk1 > 2):
-                tags_abs[c].append("R4")
-    
-            # R1_0: Largest |Z0| at 2H/3H harmonic BIN peaks, with |X0_peak| ≤ 0.05·Z_peak0
-            Z2p0 = meta.at[c, "Z0_peak_2"]
-            Z3p0 = meta.at[c, "Z0_peak_3"]
-            X2p0 = abs(meta.at[c, "X0_peak_2"])
-            X3p0 = abs(meta.at[c, "X0_peak_3"])
-            Zpeak0 = max(Z2p0, Z3p0)
-            X_at_Zpeak0 = X2p0 if Z2p0 >= Z3p0 else X3p0
-            if (Zpeak0 > 5 * Z_REF) and (X_at_Zpeak0 <= 0.05 * Zpeak0):
-                tags_abs[c].append("R1_0")
-    
-            # R2_0: Highest global |Z0_pk| with Q0_pk > 3
-            Zpk0, Qpk0 = meta.at[c, "Z0_pk"], meta.at[c, "Q0_pk"]
-            if (Zpk0 > 5 * Z_REF) and (Qpk0 > 3):
-                tags_abs[c].append("R2_0")
-    
-            # R3_0: Deep capacitive well0: X0_min < -4·X_REF and R0_min < 10
-            Xmin0, Rmin0 = meta.at[c, "X0_min"], meta.at[c, "R0_min"]
-            if (Xmin0 < -4 * X_REF) and (Rmin0 < 10):
-                tags_abs[c].append("R3_0")
-    
-            # R4_0: Low‐freq peak0: f_pk < 0.8·FUND with Q0_pk > 2
-            if (fpk < 0.8 * FUND) and (Qpk0 > 2):
-                tags_abs[c].append("R4_0")
-    
-        # Print hit counts
-        print("   Hit counts:")
-        for rule in ABS_ORDER[:-1]:
-            count = sum(rule in tags_abs[c] for c in cases)
-            print(f"    {rule}: {count}")
-    
-        # 4. Select winners for each absolute rule
-        print("▶ 4. Selecting winners for each absolute rule …")
-        for rule in ABS_ORDER[:-1]:
-            candidates = [c for c in cases if rule in tags_abs[c]]
-            if not candidates:
-                continue
-    
+@@ -287,51 +289,51 @@ def main():
             if rule in ("R1", "R1_0"):
                 key_peak = "Z1_peak_2" if rule == "R1" else "Z0_peak_2"
                 Zvals2 = meta.loc[candidates, key_peak]
@@ -337,155 +132,7 @@ def main():
         REL_ORDER.extend([
             f"H-Z_exact({n}H)", f"H-X_exact({n}H)", f"H-Q_exact({n}H)",
             f"H-Z_peak({n}H)", f"H-X_peak({n}H)", f"H-Q_peak({n}H)"
-        ])
-    for n in range(2, MAX_HARMONIC + 1):
-        REL_ORDER.extend([
-            f"H-Z0_exact({n}H)", f"H-X0_exact({n}H)", f"H-Q0_exact({n}H)",
-            f"H-Z0_peak({n}H)", f"H-X0_peak({n}H)", f"H-Q0_peak({n}H)"
-        ])
-    REL_ORDER.extend([
-        "Q-R", "R-Min", "E-Zero", "ΣZ", "Q0-R", "R0-Min", "E-Zero0", "ΣZ0", "TopUp"
-    ])
-    
-    # 6.a Harmonic exact metrics
-    for n in range(2, MAX_HARMONIC + 1):
-        Z_exact = meta[f"Z1_exact_{n}"].loc[peer_pool]
-        X_exact = meta[f"X1_exact_{n}"].abs().loc[peer_pool]
-        Q_exact = meta[f"Q1_exact_{n}"].loc[peer_pool]
-        if not Z_exact.empty:
-            for c in Z_exact.nlargest(MAX_REL_CASES).index:
-                peer_rule_cases.setdefault(f"H-Z_exact({n}H)", []).append(c)
-                peer_first_tag.setdefault(c, f"H-Z_exact({n}H)")
-        if not X_exact.empty:
-            for c in X_exact.nlargest(MAX_REL_CASES).index:
-                peer_rule_cases.setdefault(f"H-X_exact({n}H)", []).append(c)
-                peer_first_tag.setdefault(c, f"H-X_exact({n}H)")
-        if not Q_exact.empty:
-            for c in Q_exact.nlargest(MAX_REL_CASES).index:
-                peer_rule_cases.setdefault(f"H-Q_exact({n}H)", []).append(c)
-                peer_first_tag.setdefault(c, f"H-Q_exact({n}H)")
-    
-        Z_peak = meta[f"Z1_peak_{n}"].loc[peer_pool]
-        X_peak = meta[f"X1_peak_{n}"].abs().loc[peer_pool]
-        Q_peak = meta[f"Q1_peak_{n}"].loc[peer_pool]
-        if not Z_peak.empty:
-            top_cases = Z_peak[Z_peak > 0].nlargest(MAX_REL_CASES).index
-            for c in top_cases:
-                peer_rule_cases.setdefault(f"H-Z_peak({n}H)", []).append(c)
-                peer_first_tag.setdefault(c, f"H-Z_peak({n}H)")
-        if not X_peak.empty:
-            top_cases = X_peak[X_peak > 0].nlargest(MAX_REL_CASES).index
-            for c in top_cases:
-                peer_rule_cases.setdefault(f"H-X_peak({n}H)", []).append(c)
-                peer_first_tag.setdefault(c, f"H-X_peak({n}H)")
-        if not Q_peak.empty:
-            top_cases = Q_peak[Q_peak > 0].nlargest(MAX_REL_CASES).index
-            for c in top_cases:
-                peer_rule_cases.setdefault(f"H-Q_peak({n}H)", []).append(c)
-                peer_first_tag.setdefault(c, f"H-Q_peak({n}H)")
-    
-    # 6.b Zero sequence exact and bin‐peak
-    for n in range(2, MAX_HARMONIC + 1):
-        Z0_exact = meta[f"Z0_exact_{n}"].loc[peer_pool]
-        X0_exact = meta[f"X0_exact_{n}"].abs().loc[peer_pool]
-        Q0_exact = meta[f"Q0_exact_{n}"].loc[peer_pool]
-        if not Z0_exact.empty:
-            for c in Z0_exact.nlargest(MAX_REL_CASES).index:
-                peer_rule_cases.setdefault(f"H-Z0_exact({n}H)", []).append(c)
-                peer_first_tag.setdefault(c, f"H-Z0_exact({n}H)")
-        if not X0_exact.empty:
-            for c in X0_exact.nlargest(MAX_REL_CASES).index:
-                peer_rule_cases.setdefault(f"H-X0_exact({n}H)", []).append(c)
-                peer_first_tag.setdefault(c, f"H-X0_exact({n}H)")
-        if not Q0_exact.empty:
-            for c in Q0_exact.nlargest(MAX_REL_CASES).index:
-                peer_rule_cases.setdefault(f"H-Q0_exact({n}H)", []).append(c)
-                peer_first_tag.setdefault(c, f"H-Q0_exact({n}H)")
-    
-        Z0_peak = meta[f"Z0_peak_{n}"].loc[peer_pool]
-        X0_peak = meta[f"X0_peak_{n}"].abs().loc[peer_pool]
-        Q0_peak = meta[f"Q0_peak_{n}"].loc[peer_pool]
-        if not Z0_peak.empty:
-            top_cases = Z0_peak[Z0_peak > 0].nlargest(MAX_REL_CASES).index
-            for c in top_cases:
-                peer_rule_cases.setdefault(f"H-Z0_peak({n}H)", []).append(c)
-                peer_first_tag.setdefault(c, f"H-Z0_peak({n}H)")
-        if not X0_peak.empty:
-            top_cases = X0_peak[X0_peak > 0].nlargest(MAX_REL_CASES).index
-            for c in top_cases:
-                peer_rule_cases.setdefault(f"H-X0_peak({n}H)", []).append(c)
-                peer_first_tag.setdefault(c, f"H-X0_peak({n}H)")
-        if not Q0_peak.empty:
-            top_cases = Q0_peak[Q0_peak > 0].nlargest(MAX_REL_CASES).index
-            for c in top_cases:
-                peer_rule_cases.setdefault(f"H-Q0_peak({n}H)", []).append(c)
-                peer_first_tag.setdefault(c, f"H-Q0_peak({n}H)")
-    
-    # 6.c Global peer metrics
-    if peer_pool:
-        for tag, series, smallest in [
-            ("Q-R", meta.loc[peer_pool, "Q1_pk"], False),
-            ("R-Min", meta.loc[peer_pool, "R1_min"], True),
-            ("E-Zero", meta.loc[peer_pool, "f_pk"], True),
-            ("ΣZ", meta.loc[peer_pool, "ΣZ1"], False),
-            ("Q0-R", meta.loc[peer_pool, "Q0_pk"], False),
-            ("R0-Min", meta.loc[peer_pool, "R0_min"], True),
-            ("ΣZ0", meta.loc[peer_pool, "ΣZ0"], False),
-        ]:
-            cases_sorted = (series.nsmallest(MAX_REL_CASES) if smallest else series.nlargest(MAX_REL_CASES)).index
-            for c in cases_sorted:
-                peer_rule_cases.setdefault(tag, []).append(c)
-                peer_first_tag.setdefault(c, tag)
-    
-    total_selected = sum(len(v) for v in peer_rule_cases.values())
-    print(f"   Initial peer count = {total_selected}")
-    for tag in REL_ORDER:
-        for c in peer_rule_cases.get(tag, []):
-            print(f"    {tag} → {c}")
-    
-    # 7. Top‐Up fallback if fewer than MIN_REL_LIST
-    ladder = (
-        meta["Z1_pk"] / Z_REF +
-        meta[[f"Z1_peak_{n}" for n in range(2, MAX_HARMONIC+1)]].max(axis=1) / Z_REF +
-        meta["Q1_pk"] +
-        ((0.8 * FUND - meta["f_pk"]).clip(lower=0) / (0.8 * FUND)) +
-        meta["X1_min"].abs() / X_REF
-    )
-    print("▶ 7. Top-up if needed …")
-    while len(peer_first_tag) < MIN_REL_LIST:
-        remaining = [c for c in ladder.index if c not in peer_first_tag]
-        nxt = pd.Series(ladder.loc[remaining]).idxmax()
-        peer_rule_cases.setdefault("TopUp", []).append(nxt)
-        peer_first_tag.setdefault(nxt, "TopUp")
-        print(f"    TopUp → {nxt} (score={ladder[nxt]:.2f})")
-    print(f"   Final peer count = {len(peer_first_tag)}")
-    
-    # ───── 8. Emit Text Lists ─────────────────────────────────────────────────
-    def emit(path, mapping, title, order):
-        """
-        Writes a text file listing (case, tag, f_pk, Z1_pk, Q1_pk, explanation)
-        for each case whose mapping[case] == tag, in the order specified.
-        """
-        print(f"\n{title}")
-        print("Case".ljust(38), "Tag".ljust(14), "f_pk   Z1_pk   Q1_pk   Explanation")
-        print("─" * 130)
-        lines = []
-        for tag in order:
-            for case in mapping.get(tag, []):
-                explanation = LABELS.get(tag, "")
-                line = (
-                    f"{case} | {tag} | {explanation} | "
-                    f"f_pk={meta.at[case,'f_pk']:.1f}Hz | "
-                    f"Z1_pk={meta.at[case,'Z1_pk']:.1f}Ω | "
-                    f"Q1_pk={meta.at[case,'Q1_pk']:.2f}"
-                )
-                lines.append(line)
-                print(
-                    f"{case:<38} {tag:<14} {meta.at[case,'f_pk']:>5.1f}  "
-                    f"{meta.at[case,'Z1_pk']:>7.1f}  {meta.at[case,'Q1_pk']:>6.2f}   {explanation}"
-                )
-        path.write_text("\n".join(lines), encoding="utf-8")
-        print(f"   ↳ saved {len(lines)} rows to {path.name}")
+@@ -487,123 +489,142 @@ def main():
     
     abs_map = {}
     for case, tag in sel_abs.items():
@@ -628,46 +275,40 @@ def main():
             lines.append(f"Harmonic Range: 2H to {MAX_HARMONIC}H")
             lines.append(f"Bin Width: ±{HARMONIC_BAND_HZ} Hz")
             lines.append(f"Include Negative Peaks: {'Yes' if INCLUDE_NEGATIVE_PEAKS else 'No'}")
-            lines.append(f"Absolute Rule Enabled: {'Yes' if ENABLE_ABSOLUTE else 'No'}")
-            lines.append("")
-    
-            tag_map = defaultdict(list)
-            for tag, cases_list in peer_rule_cases.items():
-                for case in cases_list:
-                    tag_map[case].append(tag)
-    
-            for tag in REL_ORDER:
-                lines.append(tag)
-                lines.append("-" * len(tag))
-                for case in peer_rule_cases.get(tag, []):
-                    use_Z0 = tag.startswith(("H-X0", "H-Z0", "H-Q0", "Q0-R", "R0-Min", "ΣZ0"))
-                    fpk = meta.at[case, "f_pk"]
-                    zpk = meta.at[case, "Z0_pk" if use_Z0 else "Z1_pk"]
-                    qpk = meta.at[case, "Q0_pk" if use_Z0 else "Q1_pk"]
-                    lines.append(f"{case:<40} | {fpk:6.1f} Hz | Z={zpk:7.1f} Ω | Q={qpk:4.2f}")
-                lines.append("")
-    
-            # Duplicates
-            dup_cases = {c: t for c, t in tag_map.items() if len(t) > 1}
-            if dup_cases:
-                lines.append("Duplicate Cases Triggered by Multiple Rules")
-                lines.append("-" * 44)
-                for case, tags in dup_cases.items():
-                    fpk = meta.at[case, "f_pk"]
-                    zpk = meta.at[case, "Z1_pk"]
-                    qpk = meta.at[case, "Q1_pk"]
-                    tag_str = ", ".join(tags)
-                    lines.append(f"{case:<40} | {tag_str:<24} | {fpk:6.1f} Hz | Z={zpk:7.1f} Ω | Q={qpk:4.2f}")
-                lines.append("")
-    
-            with open(path, "w", encoding="utf-8") as f:
-                f.write("\n".join(lines))
-            print(f"   ↳ Plain-text report saved as: {path}")
-        except Exception as e:
-            print(f"   [Text Report Error] {e}")
-    
-    write_text_report("worst_case_report.txt")
+README.md
++1
+-1
 
-if __name__ == "__main__":
-    main()
+# Frequency Sweep Worst-Case Selection
 
+This repository contains the Python scripts for analyzing impedance sweeps stored in an Excel workbook and identifying worst cases according to absolute and relative rules.
+
+`FS_rules_current.py` is the most up-to-date version of the tool. The original file `FS_rules_Hzband_textreport_final.py` is preserved alongside it for reference.
+
+## Requirements
+
+- Python 3.8+
+- `numpy`, `pandas`, `matplotlib`, `scipy`
+
+## Input Workbook
+
+Provide `fs_seet.xlsx` with sheets `R1`, `X1`, `R0`, and `X0`. Each sheet should use frequency as the index and cases as columns.
+
+## Running
+
+```bash
+python FS_rules_current.py
+```
+
+`FS_rules_current.py` represents the latest code, while the previous `FS_rules_Hzband_textreport_final.py` is kept in the repository for historical reference.
+
+Adjust configuration constants at the top of the script to change behaviour. In particular, `MAX_REL_CASES` controls how many cases are kept for each relative rule. `ENV_Z_SHIFT` sets the envelope-rule difference threshold used when absolute rules are enabled. You may override it by defining the environment variable before running, e.g. `ENV_Z_SHIFT=0.1 python FS_rules_current.py`. (The parameter has no effect unless `ENABLE_ABSOLUTE` is `True`.)
+
+## Outputs
+
+- `absolute_worst_cases.txt`
+- `relative_worst_cases.txt`
+- `worst_case_report.txt`
+- `absolute_cases.png` – plots of absolute-rule winners (only when absolute rules run)
+- `positive_sequence.png`
+- `zero_sequence.png`
