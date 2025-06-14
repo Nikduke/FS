@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FS_rules_Hzband_textreport_final.py
+FS_rules_latest.py
 ────────────────────────────────────
 Analyze impedance sweeps and select worst cases.
 
@@ -533,19 +533,23 @@ def plot_results(
         nrows = (n + ncols - 1) // ncols
         line_height = 0.03
         legend_height = nrows * line_height
-        bottom_margin = legend_height + 0.05
+        bottom_margin = min(legend_height + 0.05, 0.5)
 
         top = 0.95
         default_bottom = 0.05
         base_frac = top - default_bottom
         new_frac = top - bottom_margin
+        clipped = bottom_margin < legend_height + 0.05
         if new_frac <= 0:
             warnings.warn("Legend too tall – results may be clipped")
             new_frac = 0.1
+            clipped = True
         if new_frac < base_frac:
             scale = base_frac / new_frac
             fig.set_figheight(fig.get_figheight() * scale)
         fig.subplots_adjust(top=top, bottom=bottom_margin, hspace=0.3)
+        if clipped:
+            warnings.warn("Legend truncated; labels may be clipped")
         y_anchor = bottom_margin / 2
         fig.legend(handles, labels, loc="lower center", ncol=ncols, frameon=False, fontsize="small", bbox_to_anchor=(0.5, y_anchor))
 
