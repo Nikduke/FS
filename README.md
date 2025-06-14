@@ -11,7 +11,7 @@ This repository contains the Python scripts for analyzing impedance sweeps store
 
 ## Input Workbook
 
-Provide `fs_seet.xlsx` with sheets `R1`, `X1`, `R0`, and `X0`. Each sheet should use frequency as the index and cases as columns.
+Provide `FS_sweep.xlsx` with sheets `R1`, `X1`, `R0`, and `X0`. Each sheet should use frequency as the index and cases as columns.
 
 ## Running
 
