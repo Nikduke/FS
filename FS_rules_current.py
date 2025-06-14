@@ -26,6 +26,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
+import warnings
 
 # ───── CONFIGURATION PARAMETERS ──────────────────────────────────────────
 INCLUDE_NEGATIVE_PEAKS = True         # If True, also detect negative peaks (dips) in X/Z curves
@@ -533,9 +534,26 @@ def plot_results(
         line_height = 0.03
         legend_height = nrows * line_height
         bottom_margin = legend_height + 0.05
-        fig.subplots_adjust(bottom=bottom_margin)
+
+        top = 0.95
+        default_bottom = 0.05
+        base_frac = top - default_bottom
+        new_frac = top - bottom_margin
+        if new_frac <= 0:
+            warnings.warn("Legend too tall – results may be clipped")
+            new_frac = 0.1
+        if new_frac < base_frac:
+            scale = base_frac / new_frac
+            fig.set_figheight(fig.get_figheight() * scale)
+        fig.subplots_adjust(top=top, bottom=bottom_margin, hspace=0.3)
         y_anchor = bottom_margin / 2
         fig.legend(handles, labels, loc="lower center", ncol=ncols, frameon=False, fontsize="small", bbox_to_anchor=(0.5, y_anchor))
+
+    def line_kwargs(case):
+        tag = peer_first_tag.get(case, sel_abs.get(case, "")).lower()
+        if "peak" in tag:
+            return {"linestyle": "--", "linewidth": 1.0}
+        return {"linestyle": "-", "linewidth": 1.5}
 
     def plot_sequence(axs, metrics, cases, label_func):
         for ax, (_, df, ylabel) in zip(axs, metrics):
@@ -544,7 +562,7 @@ def plot_results(
                 ax.axvline(n - bin_halfwidth, color="gray", linestyle=":", linewidth=0.8, alpha=0.7)
                 ax.axvline(n + bin_halfwidth, color="gray", linestyle=":", linewidth=0.8, alpha=0.7)
             for c in cases:
-                ax.plot(harmonic, df[c], label=label_func(c))
+                ax.plot(harmonic, df[c], label=label_func(c), **line_kwargs(c))
             ax.set_ylabel(ylabel)
             ax.set_xticks(harmonics)
             ax.set_xticklabels([f"{n}H" for n in harmonics])
