@@ -532,8 +532,10 @@ def plot_results(
         nrows = (n + ncols - 1) // ncols
         line_height = 0.03
         legend_height = nrows * line_height
-        bottom_margin = legend_height + 0.05
-        fig.subplots_adjust(bottom=bottom_margin)
+        bottom_margin = min(legend_height + 0.05, 0.5)
+        if bottom_margin < legend_height + 0.05:
+            print("   [WARN] Legend truncated: too many cases for available space")
+        fig.subplots_adjust(top=0.95, bottom=bottom_margin, hspace=0.3)
         y_anchor = bottom_margin / 2
         fig.legend(handles, labels, loc="lower center", ncol=ncols, frameon=False, fontsize="small", bbox_to_anchor=(0.5, y_anchor))
 
