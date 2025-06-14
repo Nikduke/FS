@@ -5,11 +5,14 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
 import warnings
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def load_data(book: Path):
     """Load the Excel workbook and return frequency index and dataframes."""
-    print(f"\u25B6 1. Loading {book.name} \u2026")
+    logger.info(f"\u25B6 1. Loading {book.name} \u2026")
     try:
         R1 = pd.read_excel(book, "R1", index_col=0)
         X1 = pd.read_excel(book, "X1", index_col=0)
@@ -37,7 +40,7 @@ def compute_metrics(
     PEAK_PROMINENCE,
 ):
     """Compute base metrics and return them along with a meta dataframe."""
-    print("\u25B6 2. Computing base metrics (Z1, Z0, Q1, Q0, etc.) …")
+    logger.info("\u25B6 2. Computing base metrics (Z1, Z0, Q1, Q0, etc.) …")
     Z1 = np.hypot(R1, X1)
     Q1 = (X1.abs() / R1.replace(0, np.nan)).fillna(np.inf)
     Z0 = np.hypot(R0, X0)
