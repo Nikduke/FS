@@ -14,6 +14,34 @@ import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
 import warnings
 
+# ───── CONFIGURATION PARAMETERS ──────────────────────────────────────────
+INCLUDE_NEGATIVE_PEAKS = True         # If True, also detect negative peaks (dips) in X/Z curves
+ENABLE_ABSOLUTE = False           # True = run all absolute rules; False = skip them
+FUND = 60.0                      # Fundamental frequency [Hz]
+MAX_HARMONIC = 4                 # Highest harmonic to check (2..MAX_HARMONIC)
+HARMONIC_BAND_HZ = 5.0  # ±Hz band around each harmonic (e.g. ±5 Hz of n·FUND)
+Z_REF, X_REF = 100.0, 50.0       # Reference impedances [Ω]
+CLUSTER_BAND = 0.03              # ±3% clustering for envelope rule (C3)
+ENV_Z_SHIFT = float(os.getenv("ENV_Z_SHIFT", "0.05"))  # Fractional |Z| difference for C3
+MIN_REL_LIST = 5                 # Minimum number of relative worst cases
+MAX_REL_CASES = 2                # Max cases to keep per relative rule
+PEAK_PROMINENCE = None           # Prominence for find_peaks (None = no filtering)
+BOOK = Path("FS_sweep.xlsx")     # Input workbook
+ABS_OUT = Path("absolute_worst_cases.txt")
+REL_OUT = Path("relative_worst_cases.txt")
+FIG_POS = Path("positive_sequence.png")
+FIG_ZERO = Path("zero_sequence.png")
+FIG_ABS = Path("absolute_cases.png")
+
+# Comments on configuration:
+#  - ENABLE_ABSOLUTE: set to False to skip all absolute‐rule logic.
+#  - FUND: if your system is 50 Hz, change to 50.0.
+#  - MAX_HARMONIC: number of harmonics to check (e.g. 4 = 2nd, 3rd, 4th).
+#  - HARMONIC_BAND_HZ: window size around each harmonic. With FUND=60 and n=2,
+#      the band spans 120±5 Hz (115–125 Hz).
+#  - PEAK_PROMINENCE: threshold for scipy.find_peaks; if None, all local maxima count.
+#  - Z_REF, X_REF, CLUSTER_BAND, ENV_Z_SHIFT: absolute‐rule thresholds. ENV_Z_SHIFT
+#    can also be set via the environment variable ``ENV_Z_SHIFT``.
 
 # --- Inlined from fs_rules_core.py -------------------------------------------
 
@@ -186,35 +214,6 @@ def plot_sequence(axs, metrics, cases, label_func, harmonic, harmonics, bin_half
     return axs[0].get_legend_handles_labels()
 
 # --- End of inlined core -----------------------------------------------------
-
-# ───── CONFIGURATION PARAMETERS ──────────────────────────────────────────
-INCLUDE_NEGATIVE_PEAKS = True         # If True, also detect negative peaks (dips) in X/Z curves
-ENABLE_ABSOLUTE = False           # True = run all absolute rules; False = skip them
-FUND = 60.0                      # Fundamental frequency [Hz]
-MAX_HARMONIC = 4                 # Highest harmonic to check (2..MAX_HARMONIC)
-HARMONIC_BAND_HZ = 5.0  # ±Hz band around each harmonic (e.g. ±5 Hz of n·FUND)
-Z_REF, X_REF = 100.0, 50.0       # Reference impedances [Ω]
-CLUSTER_BAND = 0.03              # ±3% clustering for envelope rule (C3)
-ENV_Z_SHIFT = float(os.getenv("ENV_Z_SHIFT", "0.05"))  # Fractional |Z| difference for C3
-MIN_REL_LIST = 5                 # Minimum number of relative worst cases
-MAX_REL_CASES = 2                # Max cases to keep per relative rule
-PEAK_PROMINENCE = None           # Prominence for find_peaks (None = no filtering)
-BOOK = Path("FS_sweep.xlsx")     # Input workbook
-ABS_OUT = Path("absolute_worst_cases.txt")
-REL_OUT = Path("relative_worst_cases.txt")
-FIG_POS = Path("positive_sequence.png")
-FIG_ZERO = Path("zero_sequence.png")
-FIG_ABS = Path("absolute_cases.png")
-
-# Comments on configuration:
-#  - ENABLE_ABSOLUTE: set to False to skip all absolute‐rule logic.
-#  - FUND: if your system is 50 Hz, change to 50.0.
-#  - MAX_HARMONIC: number of harmonics to check (e.g. 4 = 2nd, 3rd, 4th).
-#  - HARMONIC_BAND_HZ: window size around each harmonic. With FUND=60 and n=2,
-#      the band spans 120±5 Hz (115–125 Hz).
-#  - PEAK_PROMINENCE: threshold for scipy.find_peaks; if None, all local maxima count.
-#  - Z_REF, X_REF, CLUSTER_BAND, ENV_Z_SHIFT: absolute‐rule thresholds. ENV_Z_SHIFT
-#    can also be set via the environment variable ``ENV_Z_SHIFT``.
 
 LABELS = {
     "Z1_PEAK23H":    "Largest |Z1| at 2H/3H (bin peak, |X1|≤0.05·|Z1|)",
