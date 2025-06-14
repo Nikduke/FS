@@ -20,6 +20,8 @@ Outputs
 
 import os
 import sys
+import argparse
+import logging
 from pathlib import Path
 
 import numpy as np
@@ -27,6 +29,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
 import warnings
+
+logger = logging.getLogger(__name__)
 from fs_rules_core import load_data, compute_metrics, reserve_and_legend, plot_sequence
 
 # ───── CONFIGURATION PARAMETERS ──────────────────────────────────────────
@@ -41,6 +45,7 @@ ENV_Z_SHIFT = float(os.getenv("ENV_Z_SHIFT", "0.05"))  # Fractional |Z| differen
 MIN_REL_LIST = 5                 # Minimum number of relative worst cases
 MAX_REL_CASES = 2                # Max cases to keep per relative rule
 PEAK_PROMINENCE = None           # Prominence for find_peaks (None = no filtering)
+LOG_LEVEL = "INFO"              # Default logging level
 BOOK = Path("FS_sweep.xlsx")     # Input workbook
 ABS_OUT = Path("absolute_worst_cases.txt")
 REL_OUT = Path("relative_worst_cases.txt")
@@ -134,7 +139,7 @@ def apply_absolute_rules(meta, cases):
     sel_abs = {}
 
     if ENABLE_ABSOLUTE:
-        print("▶ 3. Applying absolute rules …")
+        logger.info("\u25B6 3. Applying absolute rules …")
         for c in cases:
             fpk = meta.at[c, "f_pk"]
 
@@ -178,12 +183,12 @@ def apply_absolute_rules(meta, cases):
             if (fpk < 0.8 * FUND) and (Qpk0 > 2):
                 tags_abs[c].append("Z0_LOWFREQ_0")
 
-        print("   Hit counts:")
+        logger.info("   Hit counts:")
         for rule in ABS_ORDER[:-1]:
             count = sum(rule in tags_abs[c] for c in cases)
-            print(f"    {rule}: {count}")
+            logger.info(f"    {rule}: {count}")
 
-        print("▶ 4. Selecting winners for each absolute rule …")
+        logger.info("\u25B6 4. Selecting winners for each absolute rule …")
         for rule in ABS_ORDER[:-1]:
             candidates = [c for c in cases if rule in tags_abs[c]]
             if not candidates:
@@ -211,9 +216,9 @@ def apply_absolute_rules(meta, cases):
                     winner = meta.loc[candidates, key].idxmax()
 
             sel_abs[winner] = rule
-            print(f"    {rule} → {winner}")
+            logger.info(f"    {rule} → {winner}")
 
-        print(f"▶ 5. Applying envelope rule C3 (ENV_Z_SHIFT={ENV_Z_SHIFT}) …")
+        logger.info(f"\u25B6 5. Applying envelope rule C3 (ENV_Z_SHIFT={ENV_Z_SHIFT}) …")
         for c in cases:
             if c in sel_abs:
                 continue
@@ -228,18 +233,18 @@ def apply_absolute_rules(meta, cases):
                 )
                 if same and big:
                     sel_abs[c] = "C3"
-                    print(f"    C3 → {c}")
+                    logger.info(f"    C3 → {c}")
                     break
-        print(f"   Absolute count = {len(sel_abs)}")
+        logger.info(f"   Absolute count = {len(sel_abs)}")
     else:
-        print("▶ Skipping absolute-rule analysis (ENABLE_ABSOLUTE=False)")
+        logger.info("\u25B6 Skipping absolute-rule analysis (ENABLE_ABSOLUTE=False)")
 
     return sel_abs
 
 
 def select_relative_cases(meta, cases, sel_abs):
     """Build relative peer-metric mapping and return rule cases and order."""
-    print("▶ 6. Building relative peer-metric list …")
+    logger.info("\u25B6 6. Building relative peer-metric list …")
     peer_pool = [c for c in cases if c not in sel_abs]
     peer_rule_cases = {}
     peer_first_tag = {}
@@ -371,10 +376,10 @@ def select_relative_cases(meta, cases, sel_abs):
                 peer_first_tag.setdefault(c, tag)
 
     total_selected = sum(len(v) for v in peer_rule_cases.values())
-    print(f"   Initial peer count = {total_selected}")
+    logger.info(f"   Initial peer count = {total_selected}")
     for tag in rel_order:
         for c in peer_rule_cases.get(tag, []):
-            print(f"    {tag} → {c}")
+            logger.info(f"    {tag} → {c}")
 
     ladder = (
         meta["Z1_pk"] / Z_REF
@@ -383,14 +388,14 @@ def select_relative_cases(meta, cases, sel_abs):
         + ((0.8 * FUND - meta["f_pk"]).clip(lower=0) / (0.8 * FUND))
         + meta["X1_min"].abs() / X_REF
     )
-    print("▶ 7. Top-up if needed …")
+    logger.info("\u25B6 7. Top-up if needed …")
     while len(peer_first_tag) < MIN_REL_LIST:
         remaining = [c for c in ladder.index if c not in peer_first_tag]
         nxt = pd.Series(ladder.loc[remaining]).idxmax()
         peer_rule_cases.setdefault("TopUp", []).append(nxt)
         peer_first_tag.setdefault(nxt, "TopUp")
-        print(f"    TopUp → {nxt} (score={ladder[nxt]:.2f})")
-    print(f"   Final peer count = {len(peer_first_tag)}")
+        logger.info(f"    TopUp → {nxt} (score={ladder[nxt]:.2f})")
+    logger.info(f"   Final peer count = {len(peer_first_tag)}")
 
     return peer_rule_cases, peer_first_tag, rel_order
 
@@ -409,7 +414,7 @@ def plot_results(
     sel_abs,
 ):
     """Plot all figures and save them to disk."""
-    print("▶ 9. Plotting selected cases …")
+    logger.info("\u25B6 9. Plotting selected cases …")
     all_cases = list(peer_first_tag.keys())
     case_expl = {c: LABELS.get(peer_first_tag[c], "") for c in all_cases}
 
@@ -432,7 +437,7 @@ def plot_results(
             return {"linestyle": "--", "linewidth": 1.0}
         return {"linestyle": "-", "linewidth": 1.5}
 
-    print("▶ 9a. Positive-sequence plots …")
+    logger.info("\u25B6 9a. Positive-sequence plots …")
     metrics_pos = [
         ("X1", X1, "X1 (Ω)"),
         ("R1", R1, "R1 (Ω)"),
@@ -452,9 +457,9 @@ def plot_results(
     )
     reserve_and_legend(fig1, axs1, h1, labs1, peer_first_tag, case_expl)
     fig1.savefig(FIG_POS, dpi=300)
-    print(f"   ↳ saved {FIG_POS.name}")
+    logger.info(f"   ↳ saved {FIG_POS.name}")
 
-    print("▶ 9b. Zero-sequence plots …")
+    logger.info("\u25B6 9b. Zero-sequence plots …")
     metrics_zero = [
         ("X0", X0, "X0 (Ω)"),
         ("R0", R0, "R0 (Ω)"),
@@ -474,10 +479,10 @@ def plot_results(
     )
     reserve_and_legend(fig2, axs2, h2, labs2, peer_first_tag, case_expl)
     fig2.savefig(FIG_ZERO, dpi=300)
-    print(f"   ↳ saved {FIG_ZERO.name}")
+    logger.info(f"   ↳ saved {FIG_ZERO.name}")
 
     if ENABLE_ABSOLUTE and sel_abs:
-        print("▶ 9c. Absolute-rule plots …")
+        logger.info("\u25B6 9c. Absolute-rule plots …")
         abs_cases = list(sel_abs.keys())
         abs_first_tag = {c: sel_abs[c] for c in abs_cases}
         abs_case_expl = {c: LABELS.get(sel_abs[c], "") for c in abs_cases}
@@ -520,7 +525,7 @@ def plot_results(
                 ax.axis("off")
         reserve_and_legend(fig3, axs3.ravel(), handles, labels, abs_first_tag, abs_case_expl)
         fig3.savefig(FIG_ABS, dpi=300)
-        print(f"   ↳ saved {FIG_ABS.name}")
+        logger.info(f"   ↳ saved {FIG_ABS.name}")
 
     plt.show()
 
@@ -571,9 +576,9 @@ def write_report(meta, peer_rule_cases, rel_order):
 
         with open("worst_case_report.txt", "w", encoding="utf-8") as f:
             f.write("\n".join(lines))
-        print("   ↳ Plain-text report saved as: worst_case_report.txt")
+        logger.info("   ↳ Plain-text report saved as: worst_case_report.txt")
     except Exception as e:
-        print(f"   [Text Report Error] {e}")
+        logger.warning(f"   [Text Report Error] {e}")
 
 
 def main():
@@ -595,9 +600,9 @@ def main():
     peer_rule_cases, peer_first_tag, rel_order = select_relative_cases(meta, cases, sel_abs)
 
     def emit(path, mapping, title, order):
-        print(f"\n{title}")
-        print("Case".ljust(38), "Tag".ljust(14), "f_pk   Z1_pk   Q1_pk   Explanation")
-        print("─" * 130)
+        logger.info("\n" + title)
+        logger.info("Case".ljust(38) + " " + "Tag".ljust(14) + " f_pk   Z1_pk   Q1_pk   Explanation")
+        logger.info("─" * 130)
         lines = []
         for tag in order:
             for case in mapping.get(tag, []):
@@ -609,12 +614,12 @@ def main():
                     f"Q1_pk={meta.at[case,'Q1_pk']:.2f}"
                 )
                 lines.append(line)
-                print(
+                logger.info(
                     f"{case:<38} {tag:<14} {meta.at[case,'f_pk']:>5.1f}  "
                     f"{meta.at[case,'Z1_pk']:>7.1f}  {meta.at[case,'Q1_pk']:>6.2f}   {explanation}"
                 )
         path.write_text("\n".join(lines), encoding="utf-8")
-        print(f"   ↳ saved {len(lines)} rows to {path.name}")
+        logger.info(f"   ↳ saved {len(lines)} rows to {path.name}")
 
     abs_map = {}
     for case, tag in sel_abs.items():
@@ -627,5 +632,13 @@ def main():
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Frequency Sweep Worst-Case Selection")
+    parser.add_argument(
+        "--log-level",
+        default=LOG_LEVEL,
+        help="Logging level (e.g. INFO, DEBUG)",
+    )
+    args = parser.parse_args()
+    logging.basicConfig(level=args.log_level.upper(), format="%(levelname)s: %(message)s")
     main()
 
