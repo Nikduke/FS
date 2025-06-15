@@ -168,10 +168,10 @@ def compute_metrics(
 
 
 def reserve_and_legend(fig, axs, handles, raw_labels, tag_map, expl_map):
-    """Add a bottom legend and grow the figure height to fit it."""
+    """Add a bottom legend and expand the figure so it never overlaps plots."""
     labels = [f"{c}: {tag_map[c]} – {expl_map[c]}" for c in raw_labels]
 
-    # Initial legend placement to measure its height
+    # Temporary legend to measure its height
     legend = fig.legend(
         handles,
         labels,
@@ -183,24 +183,24 @@ def reserve_and_legend(fig, axs, handles, raw_labels, tag_map, expl_map):
         bbox_transform=fig.transFigure,
     )
 
-    # Draw once to determine the legend size
+    # Draw once so the legend has a size
     fig.canvas.draw()
     legend_height = legend.get_window_extent().height / fig.dpi
 
-    # Extra padding below the legend in inches
-    pad_in = legend_height * 0.2
+    pad_in = legend_height * 0.3  # breathing room below legend
 
-    # Grow the figure height to keep subplot sizes unchanged
     new_height = fig.get_figheight() + legend_height + pad_in
     fig.set_figheight(new_height)
 
     bottom = (legend_height + pad_in / 2) / new_height
-    fig.subplots_adjust(bottom=bottom, hspace=0.3)
 
-    # Reposition the legend inside the new bottom margin
+    # Reserve space for the legend and tighten layout within that box
+    fig.tight_layout(rect=[0, bottom, 1, 1], h_pad=0.3)
+    fig.subplots_adjust(bottom=bottom)
+
+    # Place legend centred in the reserved bottom margin
     legend.set_bbox_to_anchor((0.5, bottom / 2), transform=fig.transFigure)
 
-    fig.tight_layout()
 
 
 def plot_sequence(axs, metrics, cases, label_func, harmonic, harmonics, bin_halfwidth, line_kwargs=None):
