@@ -169,8 +169,7 @@ def compute_metrics(
 
 def reserve_and_legend(fig, axs, handles, raw_labels, tag_map, expl_map):
     """Add a bottom legend and expand the figure so it never overlaps plots."""
-    labels = [f"{c}: {tag_map[c]} – {expl_map[c]}" for c in raw_labels]
-
+    labels = [f"{c}: {tag_map[c]} – {expl_map[c]}" for c in raw_labels
     # Temporary legend to measure size based on number of entries
     legend = fig.legend(
         handles,
@@ -182,7 +181,6 @@ def reserve_and_legend(fig, axs, handles, raw_labels, tag_map, expl_map):
         bbox_to_anchor=(0.5, 0.0),
         bbox_transform=fig.transFigure,
     )
-
     # Force a draw so legend dimensions are known
     fig.canvas.draw()
     legend_height = legend.get_window_extent().height / fig.dpi
@@ -203,7 +201,6 @@ def reserve_and_legend(fig, axs, handles, raw_labels, tag_map, expl_map):
 
     # Place legend centred in the reserved bottom margin
     legend.set_bbox_to_anchor((0.5, bottom / 2), transform=fig.transFigure)
-
 
 
 def plot_sequence(axs, metrics, cases, label_func, harmonic, harmonics, bin_halfwidth, line_kwargs=None):
