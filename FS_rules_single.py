@@ -168,33 +168,19 @@ def compute_metrics(
 
 
 def reserve_and_legend(fig, axs, handles, raw_labels, tag_map, expl_map, *, max_height=0.5):
-    """Adjust bottom margin and place a figure legend."""
+    """Adjust margins and place the legend below the plots."""
     labels = [f"{c}: {tag_map[c]} – {expl_map[c]}" for c in raw_labels]
-    n = len(labels)
-    ncols = 2
-    nrows = (n + ncols - 1) // ncols
-    line_height = 0.03
-    legend_height = nrows * line_height
-    bottom_margin = legend_height + 0.05
-    if max_height is not None:
-        bottom_margin = min(bottom_margin, max_height)
-    top = 0.95
-    default_bottom = 0.05
-    base_frac = top - default_bottom
-    new_frac = top - bottom_margin
-    clipped = bottom_margin < legend_height + 0.05
-    if new_frac <= 0:
-        warnings.warn("Legend too tall – results may be clipped")
-        new_frac = 0.1
-        clipped = True
-    if new_frac < base_frac:
-        scale = base_frac / new_frac
-        fig.set_figheight(fig.get_figheight() * scale)
-    fig.subplots_adjust(top=top, bottom=bottom_margin, hspace=0.3)
-    if clipped:
-        warnings.warn("Legend truncated; labels may be clipped")
-    y_anchor = bottom_margin / 2
-    fig.legend(handles, labels, loc="lower center", ncol=ncols, frameon=False, fontsize="small", bbox_to_anchor=(0.5, y_anchor))
+    fig.subplots_adjust(bottom=0.2, hspace=0.3)
+    fig.legend(
+        handles,
+        labels,
+        loc="lower center",
+        bbox_to_anchor=(0.5, -0.05),
+        ncol=2,
+        frameon=False,
+        fontsize="small",
+    )
+    fig.tight_layout()
 
 
 def plot_sequence(axs, metrics, cases, label_func, harmonic, harmonics, bin_halfwidth, line_kwargs=None):
