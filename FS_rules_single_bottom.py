@@ -175,10 +175,12 @@ def reserve_and_legend(fig, axs, handles, raw_labels, tag_map, expl_map):
     tmp_legend = fig.legend(
         handles,
         labels,
-        loc="center",
+        loc="center"
         ncol=2,
         frameon=False,
         fontsize="small",
+        bbox_to_anchor=(0.5, 0.0),
+        bbox_transform=fig.transFigure,
     )
     fig.canvas.draw()
     legend_height = tmp_legend.get_window_extent().height / fig.dpi
