@@ -186,7 +186,7 @@ def reserve_and_legend(fig, axs, handles, raw_labels, tag_map, expl_map):
     fig.canvas.draw()
     legend_height = legend.get_window_extent().height / fig.dpi
 
-    pad_in = legend_height * 0.3  # breathing room below legen
+    bottom = (legend_height + pad_in) / new_height
     new_height = fig.get_figheight() + legend_height + pad_in
     fig.set_figheight(new_height)
 
