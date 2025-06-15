@@ -125,37 +125,47 @@ def compute_metrics(
             R_band = Rdf.loc[mask, :]
 
             Z_peak = pd.Series(index=cases, dtype=float)
-            X_at_peak = pd.Series(index=cases, dtype=float)
-            R_at_peak = pd.Series(index=cases, dtype=float)
+            X_peak = pd.Series(index=cases, dtype=float)
             Q_peak = pd.Series(index=cases, dtype=float)
 
             for c in cases:
-                values = Z_band[c].to_numpy()
-                if INCLUDE_NEGATIVE_PEAKS:
-                    peaks_pos, _ = find_peaks(values, prominence=PEAK_PROMINENCE)
-                    peaks_neg, _ = find_peaks(-values, prominence=PEAK_PROMINENCE)
-                    peaks = np.concatenate([peaks_pos, peaks_neg])
-                else:
-                    peaks, _ = find_peaks(values, prominence=PEAK_PROMINENCE)
+                z_vals = Z_band[c].to_numpy()
+                x_vals = X_band[c].to_numpy()
+                r_vals = R_band[c].to_numpy()
+                q_vals = np.abs(x_vals) / np.where(r_vals == 0, np.nan, r_vals)
+                q_vals = np.nan_to_num(q_vals, nan=np.inf)
 
-                if peaks.size > 0:
-                    best_idx = peaks[np.argmax(values[peaks])]
-                    freq_of_peak = freqs[mask][best_idx]
-                    Z_peak[c] = values[best_idx]
-                    X_at_peak[c] = X_band.at[freq_of_peak, c]
-                    R_at_peak[c] = R_band.at[freq_of_peak, c]
-                    Q_peak[c] = abs(X_at_peak[c]) / (
-                        R_at_peak[c] if R_at_peak[c] != 0 else np.nan
-                    )
+                if INCLUDE_NEGATIVE_PEAKS:
+                    pz_pos, _ = find_peaks(z_vals, prominence=PEAK_PROMINENCE)
+                    pz_neg, _ = find_peaks(-z_vals, prominence=PEAK_PROMINENCE)
+                    peaks_z = np.concatenate([pz_pos, pz_neg])
+                else:
+                    peaks_z, _ = find_peaks(z_vals, prominence=PEAK_PROMINENCE)
+
+                peaks_x, _ = find_peaks(np.abs(x_vals), prominence=PEAK_PROMINENCE)
+                peaks_q, _ = find_peaks(q_vals, prominence=PEAK_PROMINENCE)
+
+                if peaks_z.size > 0:
+                    idx_z = peaks_z[np.argmax(z_vals[peaks_z])]
+                    Z_peak[c] = z_vals[idx_z]
                 else:
                     Z_peak[c] = 0.0
-                    X_at_peak[c] = 0.0
-                    R_at_peak[c] = np.nan
+
+                if peaks_x.size > 0:
+                    idx_x = peaks_x[np.argmax(np.abs(x_vals)[peaks_x])]
+                    X_peak[c] = x_vals[idx_x]
+                else:
+                    X_peak[c] = 0.0
+
+                if peaks_q.size > 0:
+                    idx_q = peaks_q[np.argmax(q_vals[peaks_q])]
+                    Q_peak[c] = q_vals[idx_q]
+                else:
                     Q_peak[c] = 0.0
 
             meta[f"Z{seq_label}_peak_{n}"] = Z_peak
-            meta[f"X{seq_label}_peak_{n}"] = X_at_peak
-            meta[f"Q{seq_label}_peak_{n}"] = Q_peak.fillna(np.inf)
+            meta[f"X{seq_label}_peak_{n}"] = X_peak
+            meta[f"Q{seq_label}_peak_{n}"] = Q_peak
 
     # 2.4 Min values and energy (area under |Z| curve)
     meta["X1_min"], meta["R1_min"] = X1.min(), R1.min()
