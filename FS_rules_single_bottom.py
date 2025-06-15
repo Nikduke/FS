@@ -169,8 +169,8 @@ def compute_metrics(
 
 def reserve_and_legend(fig, axs, handles, raw_labels, tag_map, expl_map):
     """Add a bottom legend and expand the figure so it never overlaps plots."""
-    labels = [f"{c}: {tag_map[c]} – {expl_map[c]}" for c in raw_labels]
-    # Temporary legend to measure its height
+    labels = [f"{c}: {tag_map[c]} – {expl_map[c]}" for c in raw_labels
+    # Temporary legend to measure size based on number of entries
     legend = fig.legend(
         handles,
         labels,
@@ -181,16 +181,19 @@ def reserve_and_legend(fig, axs, handles, raw_labels, tag_map, expl_map):
         bbox_to_anchor=(0.5, 0.0),
         bbox_transform=fig.transFigure,
     )
-
-    # Draw once so the legend has a size
+    # Force a draw so legend dimensions are known
     fig.canvas.draw()
     legend_height = legend.get_window_extent().height / fig.dpi
 
-    pad_in = legend_height * 0.3  # breathing room below legen
+    # Pad scales with one legend row height; this adapts to case count
+    n_rows = max(1, int(np.ceil(len(labels) / 2)))
+    row_height = legend_height / n_rows
+    pad_in = row_height * 0.7
+
     new_height = fig.get_figheight() + legend_height + pad_in
     fig.set_figheight(new_height)
 
-    bottom = (legend_height + pad_in / 2) / new_height
+    bottom = (legend_height + pad_in) / new_height
 
     # Reserve space for the legend and tighten layout within that box
     fig.tight_layout(rect=[0, bottom, 1, 1], h_pad=0.3)
