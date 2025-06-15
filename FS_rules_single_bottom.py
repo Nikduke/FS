@@ -167,19 +167,39 @@ def compute_metrics(
     return meta, Z1, Z0, Q1, Q0
 
 
-def reserve_and_legend(fig, axs, handles, raw_labels, tag_map, expl_map, *, max_height=0.5):
-    """Adjust margins and place the legend below the plots."""
+def reserve_and_legend(fig, axs, handles, raw_labels, tag_map, expl_map):
+    """Add a bottom legend and grow the figure height to fit it."""
     labels = [f"{c}: {tag_map[c]} – {expl_map[c]}" for c in raw_labels]
-    fig.subplots_adjust(bottom=0.2, hspace=0.3)
-    fig.legend(
+
+    # Initial legend placement to measure its height
+    legend = fig.legend(
         handles,
         labels,
         loc="lower center",
-        bbox_to_anchor=(0.5, -0.05),
         ncol=2,
         frameon=False,
         fontsize="small",
+        bbox_to_anchor=(0.5, 0.0),
+        bbox_transform=fig.transFigure,
     )
+
+    # Draw once to determine the legend size
+    fig.canvas.draw()
+    legend_height = legend.get_window_extent().height / fig.dpi
+
+    # Extra padding below the legend in inches
+    pad_in = legend_height * 0.2
+
+    # Grow the figure height to keep subplot sizes unchanged
+    new_height = fig.get_figheight() + legend_height + pad_in
+    fig.set_figheight(new_height)
+
+    bottom = (legend_height + pad_in / 2) / new_height
+    fig.subplots_adjust(bottom=bottom, hspace=0.3)
+
+    # Reposition the legend inside the new bottom margin
+    legend.set_bbox_to_anchor((0.5, bottom / 2), transform=fig.transFigure)
+
     fig.tight_layout()
 
 
